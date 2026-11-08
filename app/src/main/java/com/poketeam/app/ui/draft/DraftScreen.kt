@@ -52,6 +52,8 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.graphics.RectangleShape
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
@@ -65,6 +67,7 @@ import com.poketeam.app.domain.ModoDraft
 import com.poketeam.app.domain.Pokemon
 import com.poketeam.app.ui.pokedex.LinhaPokemon
 import com.poketeam.app.ui.pokedex.Sprite
+import com.poketeam.app.ui.pokedex.SpriteAnimado
 import com.poketeam.app.ui.tema.SeloTipo
 import com.poketeam.app.ui.times.CorAlerta
 import com.poketeam.app.ui.tema.ConfirmarExclusao
@@ -219,7 +222,9 @@ private fun ResumoEscolhas(t: TelaDraft, destaque: Int?) {
 }
 
 @Composable
-private fun Opcoes(opcoes: List<Pokemon>, cor: Color, escolher: (Pokemon) -> Unit) {
+private fun Opcoes(opcoes: List<Pokemon>, cor: Color, escolherSemToque: (Pokemon) -> Unit) {
+    val toque = LocalHapticFeedback.current
+    val escolher: (Pokemon) -> Unit = { toque.performHapticFeedback(HapticFeedbackType.LongPress); escolherSemToque(it) }
     if (opcoes.isEmpty()) {
         Text("Não sobrou ninguém no pool para sortear. Use \"Buscar\" ou encerre o draft.",
             color = CorAlerta, modifier = Modifier.padding(16.dp))
@@ -235,7 +240,7 @@ private fun Opcoes(opcoes: List<Pokemon>, cor: Color, escolher: (Pokemon) -> Uni
                     .clickable { escolher(p) }.padding(vertical = 12.dp, horizontal = 4.dp),
                 horizontalAlignment = Alignment.CenterHorizontally,
             ) {
-                Sprite(p, 88)
+                SpriteAnimado(p, 88)
                 Text(p.nome, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.padding(top = 6.dp))
                 if (p.forma != null) Text(p.forma, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1)
                 Row(horizontalArrangement = Arrangement.spacedBy(2.dp), modifier = Modifier.padding(top = 4.dp)) {

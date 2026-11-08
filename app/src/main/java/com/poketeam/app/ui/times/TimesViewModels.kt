@@ -25,11 +25,20 @@ import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 
 /** Time com os pokémons já resolvidos a partir dos ids. */
-data class TimeResolvido(val time: Time, val pokemons: List<Pokemon>) {
-    val analise: AnaliseTime by lazy { AnaliseTime.de(pokemons) }
+/**
+ * Time com os pokémons resolvidos. [pokemons] são os membros como escolhidos; [emBatalha] troca
+ * o membro que mega evolui pela forma Mega (é o que a análise de fraquezas considera).
+ */
+data class TimeResolvido(val time: Time, val pokemons: List<Pokemon>, val megaAtiva: Pokemon? = null) {
+    val emBatalha: List<Pokemon> = pokemons.map { p -> if (megaAtiva != null && megaAtiva.dex == p.dex) megaAtiva else p }
+    val analise: AnaliseTime by lazy { AnaliseTime.de(emBatalha) }
 }
 
-private suspend fun Pokedex.resolver(t: Time) = TimeResolvido(t, t.membros.mapNotNull { porId(it) })
+private suspend fun Pokedex.resolver(t: Time): TimeResolvido {
+    val membros = t.membros.mapNotNull { porId(it) }
+    val mega = t.mega?.let { porId(it) }?.takeIf { m -> membros.any { it.dex == m.dex } }
+    return TimeResolvido(t, membros, mega)
+}
 
 class MeusTimesViewModel(private val times: Times, private val pokedex: Pokedex, private val sorteador: Sorteador) : ViewModel() {
     val lista: StateFlow<List<TimeResolvido>?> = times.todos
@@ -79,6 +88,17 @@ class EditorTimeViewModel(
         .map { t -> t?.pokemons.orEmpty().associate { it.id to builds.de(it.id) } }
         .flowOn(Dispatchers.Default)
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyMap())
+
+    /** Formas Mega disponíveis para cada membro (id do membro -> megas). */
+    val megasDoTime: StateFlow<Map<Int, List<Pokemon>>> = time
+        .map { t -> t?.pokemons.orEmpty().associate { it.id to pokedex.megasDe(it.dex) }.filterValues { it.isNotEmpty() } }
+        .flowOn(Dispatchers.Default)
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyMap())
+
+    /** Ativa a Mega (ou desliga, se já era ela). Só uma por time. */
+    fun alternarMega(megaId: Int) = viewModelScope.launch {
+        times.atualizar(id) { t -> t.copy(mega = if (t.mega == megaId) null else megaId) }
+    }
 
     fun escolherBuild(pokemonId: Int, indice: Int) = viewModelScope.launch {
         times.atualizar(id) { t -> t.copy(builds = t.builds + (pokemonId to indice)) }

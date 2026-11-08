@@ -53,6 +53,8 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.graphics.RectangleShape
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
@@ -65,8 +67,10 @@ import com.poketeam.app.domain.Pokemon
 import com.poketeam.app.domain.Time
 import com.poketeam.app.ui.pokedex.BarraStat
 import com.poketeam.app.ui.pokedex.Sprite
+import com.poketeam.app.ui.pokedex.SpriteAnimado
 import com.poketeam.app.ui.tema.SeloTipo
 import com.poketeam.app.ui.tema.LocalPaleta
+import com.poketeam.app.ui.tema.bordaPixel
 import com.poketeam.app.domain.Build
 import com.poketeam.app.ui.builds.CartaoBuild
 import androidx.compose.material.icons.filled.AutoAwesome
@@ -134,6 +138,7 @@ fun EditorTimeScreen(
         Text("${t.pokemons.size} de ${Time.MAXIMO}", style = MaterialTheme.typography.labelMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(start = 16.dp, top = 8.dp))
 
+        val megas by vm.megasDoTime.collectAsStateWithLifecycle()
         // 6 vagas em 3 colunas, dentro da caixa pixel
         CaixaPixel(Modifier.padding(12.dp).fillMaxWidth(), preenchimento = PaddingValues(12.dp)) {
         Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -142,7 +147,10 @@ fun EditorTimeScreen(
                     linha.forEach { i ->
                         val p = t.pokemons.getOrNull(i)
                         Box(Modifier.weight(1f)) {
-                            if (p != null) VagaOcupada(p, aoVerFicha = { aoVerFicha(p) }, aoRemover = { vm.remover(i) })
+                            if (p != null) VagaOcupada(
+                                t.emBatalha[i], megas = megas[p.id].orEmpty(), megaAtiva = t.megaAtiva?.id,
+                                aoVerFicha = { aoVerFicha(p) }, aoRemover = { vm.remover(i) }, aoMega = vm::alternarMega,
+                            )
                             else VagaVazia(ativa = i == t.pokemons.size, aoClicar = aoAdicionar)
                         }
                     }
@@ -156,7 +164,7 @@ fun EditorTimeScreen(
         BarraSorteio(vm, cheio = t.time.cheio, nomePool = nomePool)
 
         val sugestoes by vm.sugestoes.collectAsStateWithLifecycle()
-        if (sugestoes.isNotEmpty()) FaixaSugestoes(sugestoes, temProblemas = t.analise.problemas.isNotEmpty(), aoEscolher = vm::adicionar)
+        if (sugestoes.isNotEmpty()) FaixaSugestoes(sugestoes, temProblemas = t.analise.problemas.isNotEmpty(), aoEscolherSemToque = vm::adicionar)
 
         val buildsDoTime by vm.buildsDoTime.collectAsStateWithLifecycle()
         if (t.pokemons.isNotEmpty()) BuildsDoTime(t, buildsDoTime, vm::escolherBuild)
@@ -285,7 +293,9 @@ private fun BuildsDoTime(t: TimeResolvido, builds: Map<Int, List<Build>>, aoEsco
 }
 
 @Composable
-private fun FaixaSugestoes(sugestoes: List<Sugestao>, temProblemas: Boolean, aoEscolher: (Pokemon) -> Unit) {
+private fun FaixaSugestoes(sugestoes: List<Sugestao>, temProblemas: Boolean, aoEscolherSemToque: (Pokemon) -> Unit) {
+    val toque = LocalHapticFeedback.current
+    val aoEscolher: (Pokemon) -> Unit = { toque.performHapticFeedback(HapticFeedbackType.LongPress); aoEscolherSemToque(it) }
     Text(
         if (temProblemas) "Quem fecha os pontos fracos" else "Quem combina com esse time",
         style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold,
@@ -321,26 +331,42 @@ private fun FaixaSugestoes(sugestoes: List<Sugestao>, temProblemas: Boolean, aoE
 }
 
 @Composable
-private fun VagaOcupada(p: Pokemon, aoVerFicha: () -> Unit, aoRemover: () -> Unit) {
+private fun VagaOcupada(
+    p: Pokemon,
+    megas: List<Pokemon>,
+    megaAtiva: Int?,
+    aoVerFicha: () -> Unit,
+    aoRemover: () -> Unit,
+    aoMega: (Int) -> Unit,
+) {
     var menu by remember { mutableStateOf(false) }
+    val paleta = LocalPaleta.current
     Column(
         Modifier
             .fillMaxWidth()
             .height(144.dp)
             .background(LocalPaleta.current.vaga)
+            .then(if (p.mega) Modifier.bordaPixel(paleta.copy(borda = paleta.destaque), grossura = 2.dp, dupla = false) else Modifier)
             .clickable { menu = true }
             .padding(6.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
-        Sprite(p, 64)
+        SpriteAnimado(p, 64, pulaAoEntrar = true)
         Text(p.nome, style = MaterialTheme.typography.labelLarge, maxLines = 1, overflow = TextOverflow.Ellipsis)
-        if (p.forma != null) Text(p.forma, style = MaterialTheme.typography.labelSmall, maxLines = 1,
-            overflow = TextOverflow.Ellipsis, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        if (p.forma != null) Text(p.forma.uppercase().takeIf { p.mega } ?: p.forma, style = MaterialTheme.typography.labelSmall, maxLines = 1,
+            overflow = TextOverflow.Ellipsis, color = if (p.mega) paleta.destaque else MaterialTheme.colorScheme.onSurfaceVariant)
         Row(horizontalArrangement = Arrangement.spacedBy(2.dp), modifier = Modifier.padding(top = 2.dp)) {
             p.tipos.forEach { SeloTipo(it, compacto = true) }
         }
         DropdownMenu(expanded = menu, onDismissRequest = { menu = false }) {
             DropdownMenuItem(text = { Text("Ver ficha") }, onClick = { menu = false; aoVerFicha() })
+            megas.forEach { m ->
+                val ativa = m.id == megaAtiva
+                DropdownMenuItem(
+                    text = { Text(if (ativa) "Voltar ao normal" else "Mega evoluir" + (m.forma?.removePrefix("Mega")?.trim()?.takeIf { it.isNotEmpty() }?.let { " ($it)" } ?: "")) },
+                    onClick = { menu = false; aoMega(m.id) },
+                )
+            }
             DropdownMenuItem(text = { Text("Tirar do time") }, onClick = { menu = false; aoRemover() })
         }
     }

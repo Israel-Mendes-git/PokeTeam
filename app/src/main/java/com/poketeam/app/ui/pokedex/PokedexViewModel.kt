@@ -24,8 +24,9 @@ data class FiltroPokedex(
     val geracoes: Set<Int> = emptySet(),
     val soFinais: Boolean = false,
     val semLendarios: Boolean = false,
+    val soFavoritos: Boolean = false,
 ) {
-    val ativos: Int get() = tipos.size + geracoes.size + (if (soFinais) 1 else 0) + (if (semLendarios) 1 else 0)
+    val ativos: Int get() = tipos.size + geracoes.size + (if (soFinais) 1 else 0) + (if (semLendarios) 1 else 0) + (if (soFavoritos) 1 else 0)
 }
 
 /**
@@ -35,15 +36,19 @@ data class FiltroPokedex(
 class PokedexViewModel(
     private val pokedex: Pokedex,
     regraPool: Flow<(Pokemon) -> Boolean> = flowOf { true },
+    /** Ids favoritados; marcados com estrela na lista e usados no filtro "Favoritos". */
+    favoritos: Flow<Set<Int>> = flowOf(emptySet()),
 ) : ViewModel() {
+    val favoritos: StateFlow<Set<Int>> = favoritos.stateIn(viewModelScope, SharingStarted.Eagerly, emptySet())
+
     private val todos = MutableStateFlow<List<Pokemon>?>(null)
     private val _filtro = MutableStateFlow(FiltroPokedex())
     val filtro: StateFlow<FiltroPokedex> = _filtro
 
-    val resultado: StateFlow<List<Pokemon>?> = combine(todos, _filtro, regraPool) { lista, f, regra ->
+    val resultado: StateFlow<List<Pokemon>?> = combine(todos, _filtro, regraPool, this.favoritos) { lista, f, regra, favs ->
         // Termos normalizados uma vez por busca, não uma vez por pokémon.
         val termos = normalizar(f.busca).split(' ').filter(String::isNotEmpty)
-        lista?.filter { p -> regra(p) && passa(p, f, termos) }
+        lista?.filter { p -> regra(p) && passa(p, f, termos) && (!f.soFavoritos || p.id in favs) }
     }.flowOn(Dispatchers.Default).stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
 
     init {
@@ -55,6 +60,7 @@ class PokedexViewModel(
     fun alternarGeracao(g: Int) = _filtro.update { it.copy(geracoes = it.geracoes.alternar(g)) }
     fun alternarFinais() = _filtro.update { it.copy(soFinais = !it.soFinais) }
     fun alternarLendarios() = _filtro.update { it.copy(semLendarios = !it.semLendarios) }
+    fun alternarFavoritos() = _filtro.update { it.copy(soFavoritos = !it.soFavoritos) }
     fun limparFiltros() = _filtro.update { FiltroPokedex(busca = it.busca) }
 
     private fun passa(p: Pokemon, f: FiltroPokedex, termos: List<String>): Boolean {

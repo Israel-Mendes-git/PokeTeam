@@ -53,8 +53,10 @@ def main(pasta: Path, saida: Path):
             continue
         forma = formas.get(pid)
         padrao = p["is_default"] == "1"
-        if not padrao:
-            if forma is None or forma["is_battle_only"] == "1" or forma["is_mega"] == "1":
+        # Megas entram como forma de batalha (o app mostra na ficha e deixa um membro do time mega evoluir).
+        mega = forma is not None and forma["is_mega"] == "1"
+        if not padrao and not mega:
+            if forma is None or forma["is_battle_only"] == "1":
                 continue
             if any(x in p["identifier"] for x in EXCLUIR):
                 continue
@@ -76,11 +78,12 @@ def main(pasta: Path, saida: Path):
             "mitico": esp["is_mythical"] == "1",
             "bebe": esp["is_baby"] == "1",
             "final": sid not in tem_evolucao,
+            **({"mega": True} if mega else {}),
         })
 
     saida.parent.mkdir(parents=True, exist_ok=True)
     saida.write_text(json.dumps(lista, ensure_ascii=False, separators=(",", ":")), encoding="utf-8")
-    print(f"{len(lista)} pokémons ({sum(1 for x in lista if x['forma'])} formas) -> {saida}")
+    print(f"{len(lista)} pokémons ({sum(1 for x in lista if x['forma'])} formas, {sum(1 for x in lista if x.get('mega'))} megas) -> {saida}")
 
 
 if __name__ == "__main__":

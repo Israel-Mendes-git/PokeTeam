@@ -1,6 +1,12 @@
 package com.poketeam.app
 
 import android.app.Application
+import android.os.Build
+import coil.ImageLoader
+import coil.ImageLoaderFactory
+import coil.decode.GifDecoder
+import coil.decode.ImageDecoderDecoder
+import com.poketeam.app.ui.pokedex.carregarAnimados
 import com.poketeam.app.data.Pokedex
 import com.poketeam.app.data.Times
 import com.poketeam.app.data.Pools
@@ -11,7 +17,13 @@ import com.poketeam.app.data.Atualizador
 import com.poketeam.app.data.Drafts
 import com.poketeam.app.data.Sorteador
 
-class PokeTeamApp : Application() {
+class PokeTeamApp : Application(), ImageLoaderFactory {
+    /** GIFs animados: decodificador nativo no Android 9+, o do Coil antes disso. */
+    override fun newImageLoader(): ImageLoader = ImageLoader.Builder(this)
+        .components { if (Build.VERSION.SDK_INT >= 28) add(ImageDecoderDecoder.Factory()) else add(GifDecoder.Factory()) }
+        .build()
+
+    val animados by lazy { carregarAnimados(this) }
     val pokedex by lazy { Pokedex(this) }
     val times by lazy { Times(this) }
     val pools by lazy { Pools(this) }

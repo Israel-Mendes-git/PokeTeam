@@ -17,6 +17,8 @@ data class Pokemon(
     val mitico: Boolean,
     val bebe: Boolean,
     val final: Boolean,
+    /** Forma de batalha (Mega): fica fora das listas; aparece na ficha e no time quando ativada. */
+    val mega: Boolean = false,
 ) {
     @Transient
     val tipos: List<Tipo> = chavesTipos.map(Tipo::daChave)

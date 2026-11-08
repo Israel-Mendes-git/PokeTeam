@@ -50,6 +50,8 @@ import com.poketeam.app.ui.tema.Paletas
 import com.poketeam.app.ui.tema.TemaScreen
 import com.poketeam.app.ui.builds.NaturesScreen
 import com.poketeam.app.ui.pokedex.SeletorPool
+import com.poketeam.app.ui.pokedex.LocalAnimados
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
@@ -98,6 +100,7 @@ class MainActivity : ComponentActivity() {
             // Procura versão nova ao abrir (no máximo uma vez por dia).
             LaunchedEffect(Unit) { app.atualizador.checarSeFaltar() }
             PokeTeamTema(paleta) {
+              CompositionLocalProvider(LocalAnimados provides app.animados) {
                 DialogoAtualizacao(app.atualizador)
                 val nav = rememberNavController()
                 val rotaAtual = nav.currentBackStackEntryAsState().value?.destination?.route
@@ -141,7 +144,7 @@ class MainActivity : ComponentActivity() {
                         }
                         composable(Aba.POKEDEX.rota) {
                             val vm: PokedexViewModel = viewModel(factory = viewModelFactory {
-                                initializer { PokedexViewModel(pokedex, regraAtiva) }
+                                initializer { PokedexViewModel(pokedex, regraAtiva, app.prefs.favoritos) }
                             })
                             // O pool fica na barra de topo; aqui não repete o seletor.
                             PokedexScreen(vm, aoAbrir = { nav.navigate("pokemon/${it.id}") })
@@ -150,10 +153,11 @@ class MainActivity : ComponentActivity() {
                             val id = entrada.arguments?.getString("id")?.toIntOrNull() ?: 0
                             val p by produceState<Pokemon?>(null, id) { value = pokedex.porId(id) }
                             val bs by produceState(emptyList<com.poketeam.app.domain.Build>(), id) { value = app.builds.de(id) }
+                            val megas by produceState(emptyList<Pokemon>(), p) { value = p?.let { pokedex.megasDe(it.dex) }.orEmpty() }
                             val favoritos by app.prefs.favoritos.collectAsStateWithLifecycle()
                             p?.let {
                                 DetalheScreen(it, voltar = { nav.popBackStack() }, builds = bs, favorito = id in favoritos,
-                                    aoFavoritar = { app.prefs.alternarFavorito(id) }, aoNatures = { nav.navigate("natures") })
+                                    aoFavoritar = { app.prefs.alternarFavorito(id) }, aoNatures = { nav.navigate("natures") }, megas = megas)
                             }
                         }
                         composable("time/{id}") { entrada ->
@@ -172,7 +176,7 @@ class MainActivity : ComponentActivity() {
                         composable("escolher/{id}") { entrada ->
                             val id = entrada.arguments?.getString("id").orEmpty()
                             val vm: PokedexViewModel = viewModel(factory = viewModelFactory {
-                                initializer { PokedexViewModel(pokedex, regraAtiva) }
+                                initializer { PokedexViewModel(pokedex, regraAtiva, app.prefs.favoritos) }
                             })
                             val lista by times.todos.collectAsStateWithLifecycle()
                             val time = lista?.firstOrNull { it.id == id }
@@ -239,6 +243,7 @@ class MainActivity : ComponentActivity() {
                         }
                     }
                 }
+              }
             }
         }
     }

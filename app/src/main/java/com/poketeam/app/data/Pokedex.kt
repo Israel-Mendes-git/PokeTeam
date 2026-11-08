@@ -13,15 +13,23 @@ class Pokedex(private val context: Context) {
     private val mutex = Mutex()
     private var cache: List<Pokemon>? = null
     private var porId: Map<Int, Pokemon> = emptyMap()
+    private var megasPorDex: Map<Int, List<Pokemon>> = emptyMap()
 
+    /** Todos os pokémons escolhíveis (sem as formas Mega, que são de batalha). */
     suspend fun todos(): List<Pokemon> = mutex.withLock {
         cache ?: withContext(Dispatchers.IO) {
             val texto = context.assets.open("pokemon.json").bufferedReader().use { it.readText() }
             Json { ignoreUnknownKeys = true }.decodeFromString<List<Pokemon>>(texto)
-        }.also {
-            cache = it
-            porId = it.associateBy(Pokemon::id)
-        }
+        }.also { tudo ->
+            porId = tudo.associateBy(Pokemon::id)
+            megasPorDex = tudo.filter { it.mega }.groupBy { it.dex }
+        }.filterNot { it.mega }.also { cache = it }
+    }
+
+    /** Formas Mega da espécie (Charizard tem duas). */
+    suspend fun megasDe(dex: Int): List<Pokemon> {
+        todos()
+        return megasPorDex[dex].orEmpty()
     }
 
     suspend fun porId(id: Int): Pokemon? {

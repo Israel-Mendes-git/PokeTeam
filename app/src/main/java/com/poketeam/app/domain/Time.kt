@@ -11,6 +11,8 @@ data class Time(
     val favorito: Boolean = false,
     /** Build escolhida de cada membro: id do pokémon -> índice na lista de builds dele. */
     val builds: Map<Int, Int> = emptyMap(),
+    /** Forma Mega ativada (id da Mega); no máximo uma por time, como no jogo. */
+    val mega: Int? = null,
     val criadoEm: Long,
     val alteradoEm: Long = criadoEm,
 ) {

@@ -99,6 +99,7 @@ dependencies {
     implementation(libs.navigation.compose)
     implementation(libs.serialization.json)
     implementation(libs.coil.compose)
+    implementation(libs.coil.gif)
     debugImplementation(libs.compose.ui.tooling)
 
     testImplementation(libs.junit)

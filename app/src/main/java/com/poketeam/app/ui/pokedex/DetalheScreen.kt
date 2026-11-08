@@ -50,6 +50,7 @@ fun DetalheScreen(
     favorito: Boolean = false,
     aoFavoritar: () -> Unit = {},
     aoNatures: () -> Unit = {},
+    megas: List<Pokemon> = emptyList(),
 ) {
     Column(
         Modifier
@@ -68,7 +69,7 @@ fun DetalheScreen(
             }
         }
         Column(Modifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally) {
-            Sprite(p, 160)
+            SpriteAnimado(p, 160)
             Text("#${p.dex}  ·  Geração ${p.geracao}", color = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.padding(top = 8.dp))
             Text(p.nomeCompleto, style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold)
@@ -99,6 +100,26 @@ fun DetalheScreen(
         GrupoDefesa("Resiste ½×", defesa, 0.5)
         GrupoDefesa("Resiste ¼×", defesa, 0.25)
         GrupoDefesa("Imune", defesa, 0.0)
+        if (megas.isNotEmpty()) {
+            Secao("Mega Evolução")
+            Text("Forma de batalha: entra no time pelo menu do pokémon (\"Mega evoluir\").",
+                color = LocalPaleta.current.sub, style = MaterialTheme.typography.bodySmall, modifier = Modifier.padding(horizontal = 16.dp))
+            megas.forEach { m ->
+                Row(Modifier.padding(horizontal = 16.dp, vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
+                    SpriteAnimado(m, 72)
+                    Column(Modifier.padding(start = 12.dp)) {
+                        Text(m.nomeCompleto, style = MaterialTheme.typography.titleMedium)
+                        Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) { m.tipos.forEach { SeloTipo(it, compacto = true) } }
+                        val dif = m.stats.zip(p.stats).mapIndexedNotNull { i, (a, b) ->
+                            (a - b).takeIf { it != 0 }?.let { "${Pokemon.NOMES_STATS[i]} ${if (it > 0) "+" else ""}$it" }
+                        }
+                        Text("Total ${m.total} · " + dif.joinToString(", "), style = MaterialTheme.typography.bodySmall,
+                            color = LocalPaleta.current.sub)
+                    }
+                }
+            }
+        }
+
         Secao("Builds recomendadas (Smogon)")
         if (builds.isEmpty()) {
             Text("O Smogon não tem build para este pokémon.", color = LocalPaleta.current.sub,

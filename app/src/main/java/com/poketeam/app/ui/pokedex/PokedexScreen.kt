@@ -95,6 +95,7 @@ fun PokedexScreen(
 ) {
     val filtro by vm.filtro.collectAsStateWithLifecycle()
     val lista by vm.resultado.collectAsStateWithLifecycle()
+    val favoritos by vm.favoritos.collectAsStateWithLifecycle()
     var mostrarFiltros by rememberSaveable { mutableStateOf(false) }
 
     Column(
@@ -146,7 +147,7 @@ fun PokedexScreen(
             LazyColumn(Modifier.fillMaxSize()) {
                 items(resultado, key = Pokemon::id) { p ->
                     val marcado = p.id in marcados
-                    LinhaPokemon(p, marcado, iconeMarcado, descricaoMarcado) { if (!marcado || marcadoClicavel) aoAbrir(p) }
+                    LinhaPokemon(p, marcado, iconeMarcado, descricaoMarcado, favorito = p.id in favoritos) { if (!marcado || marcadoClicavel) aoAbrir(p) }
                 }
                 item { Spacer(Modifier.navigationBarsPadding().height(16.dp)) }
             }
@@ -159,7 +160,7 @@ fun PokedexScreen(
 }
 
 @Composable
-fun LinhaPokemon(p: Pokemon, marcado: Boolean, icone: ImageVector, descricao: String, aoClicar: () -> Unit) {
+fun LinhaPokemon(p: Pokemon, marcado: Boolean, icone: ImageVector, descricao: String, favorito: Boolean = false, aoClicar: () -> Unit) {
     Row(
         Modifier
             .fillMaxWidth()
@@ -174,6 +175,7 @@ fun LinhaPokemon(p: Pokemon, marcado: Boolean, icone: ImageVector, descricao: St
                 p.tipos.forEach { SeloTipo(it) }
             }
         }
+        if (favorito) Text("★ ", color = LocalPaleta.current.destaque)
         if (marcado) Icon(icone, descricao, tint = MaterialTheme.colorScheme.primary,
             modifier = Modifier.padding(end = 8.dp))
         Column(horizontalAlignment = Alignment.End) {
@@ -280,6 +282,7 @@ private fun PainelFiltros(filtro: FiltroPokedex, vm: PokedexViewModel, fechar: (
             FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                 FilterChip(selected = filtro.soFinais, onClick = vm::alternarFinais, label = { Text("Só evolução final") })
                 FilterChip(selected = filtro.semLendarios, onClick = vm::alternarLendarios, label = { Text("Sem lendários/míticos") })
+                FilterChip(selected = filtro.soFavoritos, onClick = vm::alternarFavoritos, label = { Text("★ Favoritos") })
             }
         }
     }
