@@ -13,16 +13,16 @@ jobs:
   publicar:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
         with:
           fetch-depth: 0
 
-      - uses: actions/setup-java@v4
+      - uses: actions/setup-java@v5
         with:
           distribution: temurin
           java-version: "17"
 
-      - uses: android-actions/setup-android@v3
+      # O ubuntu-latest já traz o Android SDK (ANDROID_HOME); o Gradle baixa o que faltar.
 
       - name: Chave de assinatura
         env:
