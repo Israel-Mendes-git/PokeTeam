@@ -7,8 +7,8 @@ compatibility_date = "2026-10-01"
 [[d1_databases]]
 binding = "DB"
 database_name = "poketeam"
-database_id = "a-preencher-depois-de-criar"
+database_id = "482a2962-997b-405e-94ac-d685da0ad967"
 
 [vars]
 # Client ID "Web" do Google Cloud (o mesmo que o app usa para pedir o token). Público por natureza.
-GOOGLE_CLIENT_ID = ""
+GOOGLE_CLIENT_ID = "364805695064-2rrgh1i6v7v0j9qfo00elg7hc0nmsqoe.apps.googleusercontent.com"
