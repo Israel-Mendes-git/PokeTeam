@@ -2,6 +2,7 @@ package com.poketeam.app.data
 
 import android.content.Context
 import com.poketeam.app.domain.ConfigDraft
+import com.poketeam.app.domain.ConfigRecomendar
 import com.poketeam.app.domain.RegrasSorteio
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -15,6 +16,7 @@ import java.io.File
 data class Preferencias(
     val regrasSorteio: RegrasSorteio = RegrasSorteio(),
     val configDraft: ConfigDraft = ConfigDraft(),
+    val configRecomendar: ConfigRecomendar = ConfigRecomendar(),
     /** id de uma paleta em ui/tema/Paletas.kt. */
     val tema: String? = null,
     /** Última vez (ms) que o app procurou atualização. */
@@ -32,6 +34,13 @@ class Prefs(context: Context) {
 
     val regrasSorteio: StateFlow<RegrasSorteio> = arquivo.valor.map { it?.regrasSorteio ?: RegrasSorteio() }
         .stateIn(arquivo.escopo, SharingStarted.Eagerly, RegrasSorteio())
+    val configRecomendar: StateFlow<ConfigRecomendar> = arquivo.valor.map { it?.configRecomendar ?: ConfigRecomendar() }
+        .stateIn(arquivo.escopo, SharingStarted.Eagerly, ConfigRecomendar())
+
+    fun mudarRecomendar(f: (ConfigRecomendar) -> ConfigRecomendar) {
+        arquivo.escopo.launch { arquivo.alterar { it.copy(configRecomendar = f(it.configRecomendar)) to Unit } }
+    }
+
     val configDraft: StateFlow<ConfigDraft> = arquivo.valor.map { it?.configDraft ?: ConfigDraft() }
         .stateIn(arquivo.escopo, SharingStarted.Eagerly, ConfigDraft())
 

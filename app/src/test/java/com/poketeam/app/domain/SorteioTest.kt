@@ -52,4 +52,29 @@ class SorteioTest {
         val cheio = pool.take(6)
         assertEquals(cheio, Sorteio.sortear(pool, cheio).time)
     }
+
+    @Test fun regrasIndividuaisFiltram() {
+        val r = RegrasSorteio(semLendarios = true, totalMinimo = 500, tiposProibidos = setOf("dragon"))
+        val forte = Pokemon(1, 1, "a", chavesTipos = listOf("fire"), stats = List(6) { 90 }, geracao = 1, lendario = false, mitico = false, bebe = false, final = true)
+        assertTrue(r.permite(forte))
+        assertTrue(!r.permite(forte.copy(stats = List(6) { 80 })))
+        assertTrue(!r.permite(forte.copy(lendario = true)))
+        assertTrue(!r.permite(forte.copy(chavesTipos = listOf("dragon"))))
+    }
+
+    @Test fun garanteTiposObrigatorios() {
+        val r = RegrasSorteio(tiposObrigatorios = setOf("ice", "ghost"), evitarFraquezas = false)
+        repeat(30) { seed ->
+            val res = Sorteio.sortear(pool, emptyList(), r, random = Random(seed))
+            val tipos = res.time.flatMap { it.tipos }
+            assertTrue("seed $seed: $tipos", Tipo.GELO in tipos && Tipo.FANTASMA in tipos)
+            assertTrue(res.tiposFaltando.isEmpty())
+        }
+    }
+
+    @Test fun avisaTipoObrigatorioImpossivel() {
+        val semFada = pool.filter { Tipo.FADA !in it.tipos }
+        val res = Sorteio.sortear(semFada, emptyList(), RegrasSorteio(tiposObrigatorios = setOf("fairy")), random = Random(1))
+        assertEquals(setOf(Tipo.FADA), res.tiposFaltando)
+    }
 }

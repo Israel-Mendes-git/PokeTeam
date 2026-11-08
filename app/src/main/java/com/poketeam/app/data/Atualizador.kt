@@ -59,13 +59,20 @@ class Atualizador(private val context: Context, private val prefs: Prefs) {
     val versaoAtual: String = BuildConfig.VERSION_NAME
     val configurado: Boolean = BuildConfig.REPO_GITHUB.isNotBlank()
 
-    /** Checagem automática ao abrir: no máximo uma vez a cada [INTERVALO_MS], e só avisa se houver novidade. */
+    /**
+     * Checagem ao abrir o app ou voltar para ele: no máximo uma vez a cada [INTERVALO_MS], só avisa se
+     * houver novidade e não repete o aviso que já está na tela. "Depois" esconde até a próxima abertura.
+     */
     suspend fun checarSeFaltar() {
         if (!configurado) return
-        val ultima = prefs.ultimaChecagem()
-        if (System.currentTimeMillis() - ultima < INTERVALO_MS) return
+        if (_estado.value is EstadoAtualizacao.Disponivel || _estado.value is EstadoAtualizacao.Baixando) return
+        // Ao abrir o app confere sempre; ao voltar do segundo plano, só depois de [INTERVALO_MS].
+        if (checouNestaAbertura && System.currentTimeMillis() - prefs.ultimaChecagem() < INTERVALO_MS) return
+        checouNestaAbertura = true
         checar(silencioso = true)
     }
+
+    private var checouNestaAbertura = false
 
     /** [silencioso]: erro de rede vira Parado em vez de mensagem (checagem automática não incomoda). */
     suspend fun checar(silencioso: Boolean = false) {
@@ -188,6 +195,6 @@ class Atualizador(private val context: Context, private val prefs: Prefs) {
     }
 
     companion object {
-        const val INTERVALO_MS = 24L * 60 * 60 * 1000
+        const val INTERVALO_MS = 10L * 60 * 1000
     }
 }

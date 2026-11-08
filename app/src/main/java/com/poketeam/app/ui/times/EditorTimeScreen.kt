@@ -34,6 +34,8 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Switch
+import androidx.compose.material3.Badge
+import androidx.compose.material3.BadgedBox
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.CircularProgressIndicator
@@ -184,7 +186,8 @@ fun EditorTimeScreen(
         if (sugestoes.isNotEmpty()) FaixaSugestoes(sugestoes, temProblemas = t.analise.problemas.isNotEmpty(), aoEscolherSemToque = vm::adicionar)
 
         val buildsDoTime by vm.buildsDoTime.collectAsStateWithLifecycle()
-        if (t.pokemons.isNotEmpty()) BuildsDoTime(t, buildsDoTime, vm::escolherBuild)
+        val padrao by vm.buildPadrao.collectAsStateWithLifecycle()
+        if (t.pokemons.isNotEmpty()) BuildsDoTime(t, buildsDoTime, padrao, vm::escolherBuild)
 
         if (t.pokemons.isNotEmpty()) Detalhes(t.analise)
         Spacer(Modifier.height(24.dp))
@@ -222,11 +225,13 @@ private fun BarraSorteio(vm: EditorTimeViewModel, cheio: Boolean, nomePool: Stri
                 Spacer(Modifier.width(6.dp))
                 Text("SORTEAR", style = MaterialTheme.typography.titleSmall)
             }
-            IconButton(onClick = { mostrarRegras = true }) { Icon(Icons.Default.Tune, "Regras do sorteio") }
+            BadgedBox(badge = { if (regras.ativas > 0) Badge { Text("${regras.ativas}") } }) {
+                IconButton(onClick = { mostrarRegras = true }) { Icon(Icons.Default.Tune, "Configurar sortear e recomendar") }
+            }
         }
         Text(
             if (cheio) "Tire alguém do time para trocar essa vaga."
-            else "Recomendar completa com quem fecha os pontos fracos e é forte no Smogon; sortear é na sorte. Pool: $nomePool.",
+            else "Recomendar escolhe o que fecha os pontos fracos; Sortear é na sorte. Ajuste os dois no botão ao lado. Pool: $nomePool.",
             style = MaterialTheme.typography.labelSmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             modifier = Modifier.padding(start = 4.dp, top = 4.dp),
@@ -236,21 +241,7 @@ private fun BarraSorteio(vm: EditorTimeViewModel, cheio: Boolean, nomePool: Stri
         }
     }
 
-    if (mostrarRegras) {
-        ModalBottomSheet(onDismissRequest = { mostrarRegras = false }) {
-            Column(Modifier.padding(horizontal = 20.dp).padding(bottom = 32.dp)) {
-                Text("Regras do sorteio", style = MaterialTheme.typography.titleLarge, modifier = Modifier.padding(bottom = 8.dp))
-                LinhaRegra("Só evolução final", "Nada de Caterpie no time sorteado", regras.soFinais) {
-                    vm.mudarRegras { r -> r.copy(soFinais = !r.soFinais) } }
-                LinhaRegra("Sem tipo repetido", "Cada tipo aparece em um membro só", regras.semTipoRepetido) {
-                    vm.mudarRegras { r -> r.copy(semTipoRepetido = !r.semTipoRepetido) } }
-                LinhaRegra("Evitar fraquezas graves", "Testa várias combinações e fica com a mais equilibrada", regras.evitarFraquezas) {
-                    vm.mudarRegras { r -> r.copy(evitarFraquezas = !r.evitarFraquezas) } }
-                LinhaRegra("Só favoritos", "Sortear, Recomendar e sugestões só entre os seus ★", regras.soFavoritos) {
-                    vm.mudarRegras { r -> r.copy(soFavoritos = !r.soFavoritos) } }
-            }
-        }
-    }
+    if (mostrarRegras) PainelConfigSorteio(vm) { mostrarRegras = false }
 }
 
 @Composable
@@ -270,14 +261,15 @@ private fun LinhaRegra(titulo: String, descricao: String, ligado: Boolean, alter
 /** Build escolhida de cada membro (a primeira do Smogon por padrão); tocar abre as outras. */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun BuildsDoTime(t: TimeResolvido, builds: Map<Int, List<Build>>, aoEscolher: (Int, Int) -> Unit) {
+private fun BuildsDoTime(t: TimeResolvido, builds: Map<Int, List<Build>>, padrao: Map<Int, Int>, aoEscolher: (Int, Int) -> Unit) {
+    val indice = { id: Int -> t.time.builds[id] ?: padrao[id] ?: 0 }
     var aberto by remember { mutableStateOf<Pokemon?>(null) }
     val paleta = LocalPaleta.current
     Text("BUILDS DO TIME", style = MaterialTheme.typography.titleSmall, modifier = Modifier.padding(start = 16.dp, top = 20.dp, bottom = 6.dp))
     Column(Modifier.padding(horizontal = 12.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
         t.pokemons.forEach { p ->
             val lista = builds[p.id].orEmpty()
-            val b = lista.getOrNull(t.time.builds[p.id] ?: 0)
+            val b = lista.getOrNull(indice(p.id))
             Row(
                 Modifier.fillMaxWidth().background(paleta.painel).clickable(enabled = lista.isNotEmpty()) { aberto = p }.padding(8.dp),
                 verticalAlignment = Alignment.CenterVertically,
@@ -304,7 +296,7 @@ private fun BuildsDoTime(t: TimeResolvido, builds: Map<Int, List<Build>>, aoEsco
                 verticalArrangement = Arrangement.spacedBy(10.dp)) {
                 Text("BUILDS DE ${p.nome.uppercase()}", style = MaterialTheme.typography.titleMedium)
                 lista.forEachIndexed { i, b ->
-                    CartaoBuild(b, escolhida = i == (t.time.builds[p.id] ?: 0)) { aoEscolher(p.id, i); aberto = null }
+                    CartaoBuild(b, escolhida = i == indice(p.id)) { aoEscolher(p.id, i); aberto = null }
                 }
             }
         }

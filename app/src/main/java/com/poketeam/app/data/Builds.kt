@@ -2,6 +2,7 @@ package com.poketeam.app.data
 
 import android.content.Context
 import com.poketeam.app.domain.Build
+import com.poketeam.app.domain.FormatoSmogon
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
@@ -34,4 +35,8 @@ class Builds(private val context: Context) {
     suspend fun forca(pokemonId: Int): Int? = carregar().forca[pokemonId.toString()]
 
     suspend fun todasForcas(): Map<Int, Int> = carregar().forca.mapKeys { it.key.toInt() }
+
+    /** Ids com pelo menos uma build no formato. */
+    suspend fun idsDoFormato(f: FormatoSmogon): Set<Int> =
+        carregar().builds.filterValues { bs -> bs.any { f.casa(it.formato) } }.keys.map { it.toInt() }.toSet()
 }

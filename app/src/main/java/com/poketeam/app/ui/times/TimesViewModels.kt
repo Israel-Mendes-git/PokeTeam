@@ -17,6 +17,7 @@ import com.poketeam.app.domain.Sugestoes
 import kotlinx.coroutines.flow.combine
 import com.poketeam.app.data.Sorteador
 import com.poketeam.app.domain.RegrasSorteio
+import com.poketeam.app.domain.ConfigRecomendar
 import kotlinx.coroutines.flow.MutableStateFlow
 import com.poketeam.app.domain.AnaliseTime
 import com.poketeam.app.domain.Pokemon
@@ -112,15 +113,26 @@ class EditorTimeViewModel(
     val regras: StateFlow<RegrasSorteio> = sorteador.regras
 
     /** Quem do pool ativo mais fecha os pontos fracos do time (vazio se o time está vazio ou cheio). */
-    val sugestoes: StateFlow<List<Sugestao>> = combine(time, pools.ativo, sorteador.regras, sorteador.favoritos) { t, pool, regras, _ ->
-        if (t == null) emptyList()
-        else Sugestoes.para(t.pokemons, sorteador.candidatos(regras).filter { !regras.soFinais || it.final },
-            forca = builds.todasForcas())
-    }.flowOn(Dispatchers.Default).stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
+    val configRecomendar: StateFlow<ConfigRecomendar> = sorteador.configRecomendar
+    fun mudarRecomendar(f: (ConfigRecomendar) -> ConfigRecomendar) = sorteador.mudarRecomendar(f)
+
+    val sugestoes: StateFlow<List<Sugestao>> =
+        combine(time, pools.ativo, sorteador.regras, sorteador.favoritos, sorteador.configRecomendar) { t, _, _, _, _ ->
+            if (t == null) emptyList()
+            else sorteador.paraRecomendar().let { (candidatos, ajustes) -> Sugestoes.para(t.pokemons, candidatos, 6, ajustes) }
+        }.flowOn(Dispatchers.Default).stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
 
     fun adicionar(p: Pokemon) = viewModelScope.launch { times.adicionarMembro(id, p.id) }
 
     /** Builds de cada membro do time (id do pokémon -> builds do Smogon). */
+    /** Build padrão de cada membro: a primeira do formato escolhido no Recomendar, se houver. */
+    val buildPadrao: StateFlow<Map<Int, Int>> = combine(time, sorteador.configRecomendar) { t, c ->
+        val f = c.formatoSmogon ?: return@combine emptyMap()
+        t?.pokemons.orEmpty().associate { p -> p.id to builds.de(p.id).indexOfFirst { f.casa(it.formato) }.coerceAtLeast(0) }
+    }.flowOn(Dispatchers.Default).stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyMap())
+
+    fun indiceBuild(t: Time, pokemonId: Int): Int = t.builds[pokemonId] ?: buildPadrao.value[pokemonId] ?: 0
+
     val buildsDoTime: StateFlow<Map<Int, List<Build>>> = time
         .map { t -> t?.pokemons.orEmpty().associate { it.id to builds.de(it.id) } }
         .flowOn(Dispatchers.Default)
@@ -144,11 +156,15 @@ class EditorTimeViewModel(
     /** Completa as vagas vazias com a recomendação (cobertura de tipos + força no Smogon), no pool ativo. */
     fun recomendar() = viewModelScope.launch {
         val t = time.value ?: return@launch
-        val regras = sorteador.regras.value
-        val pool = pools.ativo.value
-        val candidatos = sorteador.candidatos(regras).filter { !regras.soFinais || it.final }
-        val completo = Sugestoes.completar(t.pokemons, candidatos, builds.todasForcas())
+        val (candidatos, ajustes) = sorteador.paraRecomendar()
+        val completo = Sugestoes.completar(t.pokemons, candidatos, ajustes)
         times.atualizar(id) { it.copy(membros = completo.map { p -> p.id }) }
+        val faltam = ajustes.tiposObrigatorios - completo.flatMap { it.tipos }.toSet()
+        _aviso.value = when {
+            completo.size < Time.MAXIMO -> "Não há candidatos suficientes com essas configurações: ${Time.MAXIMO - completo.size} vaga(s) vazia(s)."
+            faltam.isNotEmpty() -> "Nenhum candidato trouxe: " + faltam.joinToString { it.nome } + "."
+            else -> null
+        }
     }
 
     /** Time em texto para mandar aos amigos; os nomes seguem o formato de importação do Showdown. */
@@ -160,7 +176,7 @@ class EditorTimeViewModel(
             val bs = buildsDoTime.value
             t.pokemons.forEach { p ->
                 val lista = bs[p.id].orEmpty()
-                val b = lista.getOrNull(t.time.builds[p.id] ?: 0)
+                val b = lista.getOrNull(indiceBuild(t.time, p.id))
                 appendLine(b?.paraShowdown(p.nomeShowdown) ?: p.nomeShowdown)
                 appendLine()
             }
@@ -180,6 +196,9 @@ class EditorTimeViewModel(
         _sorteando.value = true
         val r = sorteador.completar(id)
         _sorteando.value = false
+        if (r != null && r.tiposFaltando.isNotEmpty() && r.faltaram == 0) {
+            _aviso.value = "Não coube nenhum pokémon de: " + r.tiposFaltando.joinToString { it.nome } + "."
+        }
         if (r != null && r.faltaram > 0) {
             val origem = if (sorteador.regras.value.soFavoritos) "Seus favoritos não bastam" else "O pool ativo não tem pokémons suficientes"
             _aviso.value = "$origem para essas regras: " +

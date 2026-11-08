@@ -68,6 +68,8 @@ import com.poketeam.app.ui.atualizacao.DialogoAtualizacao
 import androidx.compose.material3.IconButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.compose.LifecycleEventEffect
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.unit.dp
 import com.poketeam.app.ui.times.EditorTimeScreen
@@ -103,8 +105,9 @@ class MainActivity : ComponentActivity() {
                 val estilo = if (paleta.claro) SystemBarStyle.light(t, t) else SystemBarStyle.dark(t)
                 enableEdgeToEdge(statusBarStyle = estilo, navigationBarStyle = estilo)
             }
-            // Procura versão nova ao abrir (no máximo uma vez por dia).
-            LaunchedEffect(Unit) { app.atualizador.checarSeFaltar() }
+            // Procura versão nova ao abrir o app e sempre que ele volta para a tela.
+            val escopoAtualizacao = rememberCoroutineScope()
+            LifecycleEventEffect(Lifecycle.Event.ON_START) { escopoAtualizacao.launch { app.atualizador.checarSeFaltar() } }
             PokeTeamTema(paleta) {
               CompositionLocalProvider(LocalAnimados provides app.animados) {
                 DialogoAtualizacao(app.atualizador)

@@ -51,5 +51,5 @@ class PokeTeamApp : Application(), ImageLoaderFactory {
     val builds by lazy { Builds(this) }
     val conta by lazy { Conta(this) }
     val atualizador by lazy { Atualizador(this, prefs) }
-    val sorteador by lazy { Sorteador(pokedex, pools, times, prefs) }
+    val sorteador by lazy { Sorteador(pokedex, pools, times, prefs, builds) }
 }

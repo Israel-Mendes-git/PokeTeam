@@ -79,7 +79,7 @@ fun CaixaAtualizacao(atualizador: Atualizador, modifier: Modifier = Modifier) {
                 is EstadoAtualizacao.Disponivel -> "Versão ${e.novidade.versao} disponível."
                 is EstadoAtualizacao.Baixando -> "Baixando…"
                 EstadoAtualizacao.Parado ->
-                    if (atualizador.configurado) "O app confere sozinho uma vez por dia ao abrir."
+                    if (atualizador.configurado) "O app confere sozinho sempre que você abre."
                     else "Atualização automática desligada neste build."
             }
             Text(linha, style = MaterialTheme.typography.bodySmall,
