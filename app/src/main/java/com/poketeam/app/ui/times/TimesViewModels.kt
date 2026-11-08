@@ -6,6 +6,11 @@ import com.poketeam.app.data.Pokedex
 import com.poketeam.app.data.Times
 import com.poketeam.app.data.Pools
 import com.poketeam.app.data.Builds
+import com.poketeam.app.data.Conta
+import kotlinx.coroutines.flow.filterNotNull
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.drop
+import kotlinx.coroutines.flow.debounce
 import com.poketeam.app.domain.Build
 import com.poketeam.app.domain.Sugestao
 import com.poketeam.app.domain.Sugestoes
@@ -40,7 +45,12 @@ private suspend fun Pokedex.resolver(t: Time): TimeResolvido {
     return TimeResolvido(t, membros, mega)
 }
 
-class MeusTimesViewModel(private val times: Times, private val pokedex: Pokedex, private val sorteador: Sorteador) : ViewModel() {
+class MeusTimesViewModel(
+    private val times: Times,
+    private val pokedex: Pokedex,
+    private val sorteador: Sorteador,
+    private val conta: Conta,
+) : ViewModel() {
     val lista: StateFlow<List<TimeResolvido>?> = times.todos
         .map { l -> l?.map { pokedex.resolver(it) } }
         .flowOn(Dispatchers.Default)
@@ -55,7 +65,10 @@ class MeusTimesViewModel(private val times: Times, private val pokedex: Pokedex,
         aoCriar(t)
     }
     fun duplicar(id: String) = viewModelScope.launch { times.duplicar(id) }
-    fun excluir(id: String) = viewModelScope.launch { times.excluir(id) }
+    fun excluir(id: String) = viewModelScope.launch {
+        times.excluir(id)
+        if (id in conta.compartilhados.value) runCatching { conta.pararDeCompartilhar(id) }
+    }
     fun alternarFavorito(id: String) = viewModelScope.launch { times.atualizar(id) { it.copy(favorito = !it.favorito) } }
 }
 
@@ -66,7 +79,31 @@ class EditorTimeViewModel(
     private val sorteador: Sorteador,
     private val pools: Pools,
     private val builds: Builds,
+    private val conta: Conta,
 ) : ViewModel() {
+    /** Só aparece "Compartilhar com amigos" para quem entrou na conta. */
+    val logado: StateFlow<Boolean> = conta.eu.map { it != null }.stateIn(viewModelScope, SharingStarted.Eagerly, false)
+    val compartilhado: StateFlow<Boolean> = conta.compartilhados.map { id in it }.stateIn(viewModelScope, SharingStarted.Eagerly, false)
+
+    private val _erroCompartilhar = MutableStateFlow<String?>(null)
+    val erroCompartilhar: StateFlow<String?> = _erroCompartilhar
+
+    fun alternarCompartilhar() = viewModelScope.launch {
+        val t = times.todos.value?.firstOrNull { it.id == id } ?: return@launch
+        _erroCompartilhar.value = runCatching {
+            if (compartilhado.value) conta.pararDeCompartilhar(id) else conta.compartilhar(t)
+        }.exceptionOrNull()?.message
+    }
+
+    init {
+        // Time compartilhado: cada mudança vai para o servidor (agrupada, 1,5 s depois da última).
+        @OptIn(kotlinx.coroutines.FlowPreview::class)
+        viewModelScope.launch {
+            times.todos.map { l -> l?.firstOrNull { it.id == id } }.filterNotNull().distinctUntilChanged().drop(1).debounce(1500)
+                .collect { t -> if (id in conta.compartilhados.value) runCatching { conta.compartilhar(t) } }
+        }
+    }
+
     val time: StateFlow<TimeResolvido?> = times.todos
         .map { l -> l?.firstOrNull { it.id == id }?.let { pokedex.resolver(it) } }
         .flowOn(Dispatchers.Default)

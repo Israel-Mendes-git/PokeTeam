@@ -13,6 +13,7 @@ import com.poketeam.app.data.Pools
 import com.poketeam.app.data.Prefs
 import com.poketeam.app.data.Elencos
 import com.poketeam.app.data.Builds
+import com.poketeam.app.data.Conta
 import com.poketeam.app.data.Atualizador
 import com.poketeam.app.data.Drafts
 import com.poketeam.app.data.Sorteador
@@ -31,6 +32,7 @@ class PokeTeamApp : Application(), ImageLoaderFactory {
     val prefs by lazy { Prefs(this) }
     val elencos by lazy { Elencos(this) }
     val builds by lazy { Builds(this) }
+    val conta by lazy { Conta(this) }
     val atualizador by lazy { Atualizador(this, prefs) }
     val sorteador by lazy { Sorteador(pokedex, pools, times, prefs) }
 }

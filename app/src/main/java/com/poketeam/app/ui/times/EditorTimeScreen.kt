@@ -161,6 +161,23 @@ fun EditorTimeScreen(
 
         if (t.pokemons.isNotEmpty()) PontosFracos(t.analise)
 
+        val logado by vm.logado.collectAsStateWithLifecycle()
+        if (logado) {
+            val compartilhado by vm.compartilhado.collectAsStateWithLifecycle()
+            val erro by vm.erroCompartilhar.collectAsStateWithLifecycle()
+            Row(
+                Modifier.fillMaxWidth().clickable { vm.alternarCompartilhar() }.padding(horizontal = 16.dp, vertical = 4.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Column(Modifier.weight(1f)) {
+                    Text("Compartilhar com amigos", style = MaterialTheme.typography.bodyLarge)
+                    Text(erro ?: if (compartilhado) "Seus amigos veem este time e as mudanças." else "Só você vê este time.",
+                        color = if (erro != null) CorAlerta else LocalPaleta.current.sub, style = MaterialTheme.typography.bodySmall)
+                }
+                Switch(checked = compartilhado, onCheckedChange = { vm.alternarCompartilhar() })
+            }
+        }
+
         BarraSorteio(vm, cheio = t.time.cheio, nomePool = nomePool)
 
         val sugestoes by vm.sugestoes.collectAsStateWithLifecycle()

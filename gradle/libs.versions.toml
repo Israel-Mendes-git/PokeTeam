@@ -8,6 +8,8 @@ navigation = "2.9.6"
 serialization = "1.9.0"
 coil = "2.7.0"
 junit = "4.13.2"
+credentials = "1.5.0"
+googleid = "1.1.1"
 
 [libraries]
 compose-bom = { group = "androidx.compose", name = "compose-bom", version.ref = "composeBom" }
@@ -24,6 +26,9 @@ serialization-json = { group = "org.jetbrains.kotlinx", name = "kotlinx-serializ
 coil-compose = { group = "io.coil-kt", name = "coil-compose", version.ref = "coil" }
 coil-gif = { group = "io.coil-kt", name = "coil-gif", version.ref = "coil" }
 junit = { group = "junit", name = "junit", version.ref = "junit" }
+credentials = { group = "androidx.credentials", name = "credentials", version.ref = "credentials" }
+credentials-play = { group = "androidx.credentials", name = "credentials-play-services-auth", version.ref = "credentials" }
+googleid = { group = "com.google.android.libraries.identity.googleid", name = "googleid", version.ref = "googleid" }
 
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }

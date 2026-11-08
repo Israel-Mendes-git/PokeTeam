@@ -17,6 +17,18 @@ val codigoVersao: Int = versao.split(".").map { it.takeWhile(Char::isDigit).toIn
 
 /** Repositório onde o app procura atualizações ("dono/nome"). Forks trocam em gradle.properties. */
 val repoGithub: String = findProperty("poketeam.repo") as String? ?: ""
+/**
+ * Servidor de amigos e ID "Web" do Google: config.properties na raiz (fora do Git) ou variáveis de
+ * ambiente no GitHub Actions. Sem eles, a aba Amigos explica que o recurso está desligado neste build.
+ * Teste local: -PservidorTeste=http://10.0.2.2:8787 (servidor do wrangler dev, com login falso).
+ */
+val config = Properties().apply {
+    rootProject.file("config.properties").takeIf { it.exists() }?.inputStream()?.use(::load)
+}
+val servidor: String = findProperty("servidorTeste") as String?
+    ?: System.getenv("POKETEAM_SERVIDOR") ?: config.getProperty("servidor") ?: ""
+val googleWebClientId: String = System.getenv("POKETEAM_GOOGLE_CLIENT_ID") ?: config.getProperty("googleWebClientId") ?: ""
+
 /** Só para teste local: -PapiGithub=http://10.0.2.2:8765 aponta para um servidor falso. */
 val apiGithub: String = findProperty("apiGithub") as String? ?: "https://api.github.com"
 
@@ -44,8 +56,10 @@ android {
         findProperty("sufixoTeste")?.let { applicationIdSuffix = ".teste" }
         buildConfigField("String", "REPO_GITHUB", "\"$repoGithub\"")
         buildConfigField("String", "API_GITHUB", "\"$apiGithub\"")
-        // Servidor de teste local é http; em produção só https.
-        manifestPlaceholders["permiteHttp"] = apiGithub.startsWith("http://").toString()
+        buildConfigField("String", "SERVIDOR", "\"$servidor\"")
+        buildConfigField("String", "GOOGLE_WEB_CLIENT_ID", "\"$googleWebClientId\"")
+        // Servidores de teste locais são http; em produção só https.
+        manifestPlaceholders["permiteHttp"] = (apiGithub.startsWith("http://") || servidor.startsWith("http://")).toString()
     }
 
     signingConfigs {
@@ -100,6 +114,9 @@ dependencies {
     implementation(libs.serialization.json)
     implementation(libs.coil.compose)
     implementation(libs.coil.gif)
+    implementation(libs.credentials)
+    implementation(libs.credentials.play)
+    implementation(libs.googleid)
     debugImplementation(libs.compose.ui.tooling)
 
     testImplementation(libs.junit)

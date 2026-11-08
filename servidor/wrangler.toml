@@ -1,0 +1,18 @@
+# Servidor de amigos do PokeTeam (Cloudflare Workers + D1 + R2).
+# O endereço publicado não vai para o repositório: o app recebe por poketeam.servidor (fora do Git).
+name = "poketeam"
+main = "src/index.js"
+compatibility_date = "2026-10-01"
+
+[[d1_databases]]
+binding = "DB"
+database_name = "poketeam"
+database_id = "a-preencher-depois-de-criar"
+
+[[r2_buckets]]
+binding = "FOTOS"
+bucket_name = "poketeam-fotos"
+
+[vars]
+# Client ID "Web" do Google Cloud (o mesmo que o app usa para pedir o token). Público por natureza.
+GOOGLE_CLIENT_ID = ""

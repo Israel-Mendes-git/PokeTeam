@@ -30,3 +30,19 @@ Em fork: gere sua chave, crie o `keystore.properties` e troque `poketeam.repo` e
 | `elencos/` | `python tools/gerar_elencos.py` |
 
 Os elencos de modpack ficam em `tools/elencos.json`: cada item aponta para um modpack do Modrinth (`"modrinth": "cobbleverse"`) ou para a pasta de uma instância local (`"pasta": "..."`) e vira uma opção em **Novo pool**.
+
+## Amigos (servidor)
+
+A pasta `servidor/` é um Cloudflare Worker (D1 para os dados, R2 para as fotos) com login pelo Google.
+
+```sh
+cd servidor
+npm install
+npm run banco:local && npm run dev    # servidor local em 127.0.0.1:8787, com login falso (.dev.vars)
+npm run teste                         # 22 verificações de ponta a ponta
+```
+
+App apontando para o servidor local, com botões "Entrar como Ana/Bia":
+`./gradlew assembleRelease -PservidorTeste=http://10.0.2.2:8787 -PsufixoTeste=1`
+
+Para o app de verdade, copie `config.example.properties` para `config.properties` com o endereço do Worker publicado e o Client ID "Web" do Google. Esse arquivo fica fora do Git; no GitHub Actions os mesmos valores vêm dos Secrets `POKETEAM_SERVIDOR` e `POKETEAM_GOOGLE_CLIENT_ID`.

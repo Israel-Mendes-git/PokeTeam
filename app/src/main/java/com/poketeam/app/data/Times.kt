@@ -32,6 +32,14 @@ class Times(context: Context) {
         lista + novo to novo
     }
 
+    /** Time vindo de um amigo: entra como novo, com as builds e a Mega escolhidas por ele. */
+    suspend fun importar(nome: String, membros: List<Int>, builds: Map<Int, Int>, mega: Int?): Time = arquivo.alterar { lista ->
+        val agora = System.currentTimeMillis()
+        val novo = Time(id = UUID.randomUUID().toString(), nome = nome.take(40), membros = membros.take(Time.MAXIMO),
+            builds = builds, mega = mega, criadoEm = agora)
+        lista + novo to novo
+    }
+
     suspend fun atualizar(id: String, mudanca: (Time) -> Time) = arquivo.alterar { lista ->
         lista.map { if (it.id == id) mudanca(it).copy(alteradoEm = System.currentTimeMillis()) else it } to Unit
     }

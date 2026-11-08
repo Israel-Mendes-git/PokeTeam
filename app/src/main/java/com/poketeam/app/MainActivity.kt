@@ -58,6 +58,11 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material.icons.filled.People
+import com.poketeam.app.ui.amigos.AmigosScreen
+import com.poketeam.app.ui.amigos.AmigosViewModel
+import com.poketeam.app.ui.amigos.AmigoScreen
+import com.poketeam.app.ui.amigos.AmigoViewModel
 import com.poketeam.app.ui.atualizacao.CaixaAtualizacao
 import com.poketeam.app.ui.atualizacao.DialogoAtualizacao
 import androidx.compose.material3.IconButton
@@ -76,6 +81,7 @@ private enum class Aba(val rota: String, val rotulo: String, val icone: ImageVec
     TIMES("times", "Times", Icons.Default.Groups),
     DRAFT("draft", "Draft", Icons.Default.Style),
     POKEDEX("pokedex", "Pokédex", Icons.Default.Search),
+    AMIGOS("amigos", "Amigos", Icons.Default.People),
 }
 
 class MainActivity : ComponentActivity() {
@@ -138,7 +144,7 @@ class MainActivity : ComponentActivity() {
                     ) {
                         composable(Aba.TIMES.rota) {
                             val vm: MeusTimesViewModel = viewModel(factory = viewModelFactory {
-                                initializer { MeusTimesViewModel(times, pokedex, app.sorteador) }
+                                initializer { MeusTimesViewModel(times, pokedex, app.sorteador, app.conta) }
                             })
                             MeusTimesScreen(vm, poolAtivo.nome) { id -> nav.navigate("time/$id") }
                         }
@@ -163,7 +169,7 @@ class MainActivity : ComponentActivity() {
                         composable("time/{id}") { entrada ->
                             val id = entrada.arguments?.getString("id").orEmpty()
                             val vm: EditorTimeViewModel = viewModel(factory = viewModelFactory {
-                                initializer { EditorTimeViewModel(id, times, pokedex, app.sorteador, pools, app.builds) }
+                                initializer { EditorTimeViewModel(id, times, pokedex, app.sorteador, pools, app.builds, app.conta) }
                             })
                             EditorTimeScreen(
                                 vm,
@@ -207,6 +213,19 @@ class MainActivity : ComponentActivity() {
                             PoolsScreen(vm, aoVoltar = { nav.popBackStack() }) { id -> nav.navigate("pool/$id") }
                         }
                         composable("natures") { NaturesScreen { nav.popBackStack() } }
+                        composable(Aba.AMIGOS.rota) {
+                            val vm: AmigosViewModel = viewModel(factory = viewModelFactory {
+                                initializer { AmigosViewModel(app.conta, times) }
+                            })
+                            AmigosScreen(vm) { id -> nav.navigate("amigo/$id") }
+                        }
+                        composable("amigo/{id}") { entrada ->
+                            val id = entrada.arguments?.getString("id")?.toIntOrNull() ?: 0
+                            val vm: AmigoViewModel = viewModel(factory = viewModelFactory {
+                                initializer { AmigoViewModel(id, app.conta, times, pokedex) }
+                            })
+                            AmigoScreen(vm) { nav.popBackStack() }
+                        }
                         composable("tema") {
                             TemaScreen(paleta.id, aoEscolher = app.prefs::mudarTema, aoVoltar = { nav.popBackStack() }) {
                                 CaixaAtualizacao(app.atualizador)
