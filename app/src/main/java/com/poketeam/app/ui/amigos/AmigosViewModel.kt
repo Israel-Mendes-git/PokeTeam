@@ -28,8 +28,6 @@ class AmigosViewModel(private val conta: Conta, private val times: Times) : View
     val mensagem: StateFlow<String?> = _mensagem
     fun mensagemVista() { _mensagem.value = null }
 
-    init { atualizar() }
-
     /** Roda [bloco] mostrando "ocupado" e transformando erro em mensagem para a tela. */
     private fun tarefa(sucesso: String? = null, bloco: suspend () -> Unit) = viewModelScope.launch {
         _ocupado.value = true
@@ -86,7 +84,7 @@ class AmigoViewModel(
         viewModelScope.launch {
             try {
                 val d = conta.timesDe(id)
-                val ids = d.times.flatMap { it.membros + listOfNotNull(it.mega) }.toSet()
+                val ids = (d.times.flatMap { it.membros + listOfNotNull(it.mega) } + d.favoritos).toSet()
                 _tela.value = Tela(d, ids.mapNotNull { pokedex.porId(it) }.associateBy { it.id })
             } catch (e: ErroServidor) {
                 _mensagem.value = e.message

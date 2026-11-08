@@ -51,7 +51,11 @@ data class TimeCompartilhado(
 )
 
 @Serializable
-data class TimesDoAmigo(val treinador: Treinador, val times: List<TimeCompartilhado> = emptyList())
+data class TimesDoAmigo(
+    val treinador: Treinador,
+    val times: List<TimeCompartilhado> = emptyList(),
+    val favoritos: List<Int> = emptyList(),
+)
 
 @Serializable
 private data class EstadoConta(val sessao: String? = null, val eu: Treinador? = null, val compartilhados: Set<String> = emptySet())
@@ -171,6 +175,17 @@ class Conta(private val context: Context) {
     suspend fun desfazer(id: Int) { chamar("DELETE", "/amigos/$id"); atualizarAmigos() }
 
     suspend fun timesDe(id: Int): TimesDoAmigo = json.decodeFromString(chamar("GET", "/amigos/$id/times"))
+
+    // ---------- favoritos ----------
+
+    /** Manda a lista de favoritos para os amigos verem (no máximo 100, os mais recentes). */
+    suspend fun enviarFavoritos(ids: Set<Int>) {
+        if (eu.value == null) return
+        val corpo = buildJsonObject {
+            put("favoritos", kotlinx.serialization.json.JsonArray(ids.toList().takeLast(100).map { kotlinx.serialization.json.JsonPrimitive(it) }))
+        }.toString()
+        chamar("PUT", "/eu/favoritos", corpo)
+    }
 
     // ---------- times compartilhados ----------
 

@@ -10,6 +10,8 @@ data class RegrasSorteio(
     val semTipoRepetido: Boolean = true,
     /** Tenta várias combinações e fica com a de menos fraquezas graves. */
     val evitarFraquezas: Boolean = true,
+    /** Sortear, Recomendar e sugestões só entre os pokémons favoritos. */
+    val soFavoritos: Boolean = false,
 )
 
 data class ResultadoSorteio(

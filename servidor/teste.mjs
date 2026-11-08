@@ -50,6 +50,10 @@ certo(vt.times.length === 1 && vt.times[0].nome === "Chuva" && vt.times[0].membr
 certo(vt.treinador.foto?.startsWith("http"), "foto do amigo com endereço completo");
 certo((await chamar("PUT", "/times/t2", { sessao: a.sessao, corpo: { nome: "x", membros: [1, 2, 3, 4, 5, 6, 7] } })).status === 400, "time com 7 recusado");
 
+await chamar("PUT", "/eu/favoritos", { sessao: a.sessao, corpo: { favoritos: [6, 445, 6] } });
+certo(JSON.stringify((await chamar("GET", `/amigos/${a.eu.id}/times`, { sessao: b.sessao })).dados.favoritos) === "[6,445]", "amiga vê os favoritos (sem repetir)");
+certo((await chamar("PUT", "/eu/favoritos", { sessao: a.sessao, corpo: { favoritos: ["x"] } })).status === 400, "favoritos inválidos recusados");
+
 await chamar("DELETE", "/times/t1", { sessao: a.sessao });
 certo((await chamar("GET", `/amigos/${a.eu.id}/times`, { sessao: b.sessao })).dados.times.length === 0, "tirar compartilhamento some para a amiga");
 

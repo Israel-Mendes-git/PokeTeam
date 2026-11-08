@@ -45,6 +45,7 @@ async function rotear(req, env) {
   if (m === "GET" && p === "/eu") return json(await perfil(env, eu, true, url.origin));
   if (m === "PATCH" && p === "/eu") return mudarApelido(req, env, eu);
   if (m === "PUT" && p === "/eu/foto") return mudarFoto(req, env, eu, url);
+  if (m === "PUT" && p === "/eu/favoritos") return mudarFavoritos(req, env, eu);
   if (m === "DELETE" && p === "/eu") return apagarConta(env, eu);
   if (m === "POST" && p === "/sair") return sair(req, env);
 
@@ -196,6 +197,17 @@ async function mudarFoto(req, env, eu, url) {
   return json(await perfil(env, eu, true, url.origin));
 }
 
+const MAX_FAVORITOS = 100;
+
+async function mudarFavoritos(req, env, eu) {
+  const { favoritos } = await corpo(req);
+  if (!Array.isArray(favoritos) || favoritos.length > MAX_FAVORITOS || !favoritos.every((f) => Number.isInteger(f) && f > 0)) {
+    throw new ErroHttp(400, `Lista de favoritos inválida (máx. ${MAX_FAVORITOS})`);
+  }
+  await env.DB.prepare("UPDATE usuarios SET favoritos = ? WHERE id = ?").bind(JSON.stringify([...new Set(favoritos)]), eu).run();
+  return json({ ok: true });
+}
+
 async function servirFoto(env, chave) {
   const f = await env.DB.prepare("SELECT tipo, dados FROM fotos WHERE chave = ?").bind(chave).first();
   if (!f) throw new ErroHttp(404, "Foto não encontrada");
@@ -270,7 +282,12 @@ async function meusTimes(env, eu) {
 
 async function timesDoAmigo(env, eu, amigo, url) {
   if (!(await saoAmigos(env, eu, amigo))) throw new ErroHttp(403, "Vocês não são amigos");
-  return json({ treinador: await perfil(env, amigo, false, url.origin), times: await listarTimes(env, amigo) });
+  const fav = await env.DB.prepare("SELECT favoritos FROM usuarios WHERE id = ?").bind(amigo).first();
+  return json({
+    treinador: await perfil(env, amigo, false, url.origin),
+    times: await listarTimes(env, amigo),
+    favoritos: JSON.parse(fav?.favoritos || "[]"),
+  });
 }
 
 async function salvarTime(req, env, eu, id) {

@@ -1,6 +1,10 @@
 package com.poketeam.app
 
 import android.app.Application
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.flow.filterNotNull
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.debounce
 import android.os.Build
 import coil.ImageLoader
 import coil.ImageLoaderFactory
@@ -25,6 +29,19 @@ class PokeTeamApp : Application(), ImageLoaderFactory {
         .build()
 
     val animados by lazy { carregarAnimados(this) }
+
+    private val escopo = kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.SupervisorJob() + kotlinx.coroutines.Dispatchers.IO)
+
+    @OptIn(kotlinx.coroutines.FlowPreview::class)
+    override fun onCreate() {
+        super.onCreate()
+        // Favoritos visíveis aos amigos: sincroniza ao entrar na conta e a cada mudança (agrupada).
+        escopo.launch {
+            kotlinx.coroutines.flow.combine(conta.eu, prefs.favoritos) { eu, favs -> if (eu != null) favs else null }
+                .filterNotNull().distinctUntilChanged().debounce(2000)
+                .collect { favs -> runCatching { conta.enviarFavoritos(favs) } }
+        }
+    }
     val pokedex by lazy { Pokedex(this) }
     val times by lazy { Times(this) }
     val pools by lazy { Pools(this) }

@@ -6,6 +6,7 @@
     "dev": "wrangler dev --ip 127.0.0.1 --port 8787 --local",
     "banco:local": "wrangler d1 execute poketeam --local --file=schema.sql",
     "banco:remoto": "wrangler d1 execute poketeam --remote --file=schema.sql",
+    "migrar:remoto": "wrangler d1 execute poketeam --remote --file=migracoes_001_favoritos.sql",
     "teste": "node teste.mjs",
     "deploy": "wrangler deploy"
   },

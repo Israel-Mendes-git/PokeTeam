@@ -246,6 +246,8 @@ private fun BarraSorteio(vm: EditorTimeViewModel, cheio: Boolean, nomePool: Stri
                     vm.mudarRegras { r -> r.copy(semTipoRepetido = !r.semTipoRepetido) } }
                 LinhaRegra("Evitar fraquezas graves", "Testa várias combinações e fica com a mais equilibrada", regras.evitarFraquezas) {
                     vm.mudarRegras { r -> r.copy(evitarFraquezas = !r.evitarFraquezas) } }
+                LinhaRegra("Só favoritos", "Sortear, Recomendar e sugestões só entre os seus ★", regras.soFavoritos) {
+                    vm.mudarRegras { r -> r.copy(soFavoritos = !r.soFavoritos) } }
             }
         }
     }

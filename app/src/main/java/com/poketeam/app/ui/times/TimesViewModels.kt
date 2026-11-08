@@ -112,9 +112,9 @@ class EditorTimeViewModel(
     val regras: StateFlow<RegrasSorteio> = sorteador.regras
 
     /** Quem do pool ativo mais fecha os pontos fracos do time (vazio se o time está vazio ou cheio). */
-    val sugestoes: StateFlow<List<Sugestao>> = combine(time, pools.ativo, sorteador.regras) { t, pool, regras ->
+    val sugestoes: StateFlow<List<Sugestao>> = combine(time, pools.ativo, sorteador.regras, sorteador.favoritos) { t, pool, regras, _ ->
         if (t == null) emptyList()
-        else Sugestoes.para(t.pokemons, pokedex.todos().filter { pool.permite(it) && (!regras.soFinais || it.final) },
+        else Sugestoes.para(t.pokemons, sorteador.candidatos(regras).filter { !regras.soFinais || it.final },
             forca = builds.todasForcas())
     }.flowOn(Dispatchers.Default).stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
 
@@ -146,7 +146,7 @@ class EditorTimeViewModel(
         val t = time.value ?: return@launch
         val regras = sorteador.regras.value
         val pool = pools.ativo.value
-        val candidatos = pokedex.todos().filter { pool.permite(it) && (!regras.soFinais || it.final) }
+        val candidatos = sorteador.candidatos(regras).filter { !regras.soFinais || it.final }
         val completo = Sugestoes.completar(t.pokemons, candidatos, builds.todasForcas())
         times.atualizar(id) { it.copy(membros = completo.map { p -> p.id }) }
     }
@@ -181,7 +181,8 @@ class EditorTimeViewModel(
         val r = sorteador.completar(id)
         _sorteando.value = false
         if (r != null && r.faltaram > 0) {
-            _aviso.value = "O pool ativo não tem pokémons suficientes para essas regras: " +
+            val origem = if (sorteador.regras.value.soFavoritos) "Seus favoritos não bastam" else "O pool ativo não tem pokémons suficientes"
+            _aviso.value = "$origem para essas regras: " +
                 if (r.faltaram == 1) "1 vaga ficou vazia." else "${r.faltaram} vagas ficaram vazias."
         }
     }

@@ -38,6 +38,8 @@ class PokedexViewModel(
     regraPool: Flow<(Pokemon) -> Boolean> = flowOf { true },
     /** Ids favoritados; marcados com estrela na lista e usados no filtro "Favoritos". */
     favoritos: Flow<Set<Int>> = flowOf(emptySet()),
+    /** Tela de escolher pokémon para o time: favoritos no topo da lista. */
+    private val favoritosPrimeiro: Boolean = false,
 ) : ViewModel() {
     val favoritos: StateFlow<Set<Int>> = favoritos.stateIn(viewModelScope, SharingStarted.Eagerly, emptySet())
 
@@ -49,6 +51,7 @@ class PokedexViewModel(
         // Termos normalizados uma vez por busca, não uma vez por pokémon.
         val termos = normalizar(f.busca).split(' ').filter(String::isNotEmpty)
         lista?.filter { p -> regra(p) && passa(p, f, termos) && (!f.soFavoritos || p.id in favs) }
+            ?.let { l -> if (favoritosPrimeiro) l.sortedByDescending { it.id in favs } else l }
     }.flowOn(Dispatchers.Default).stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
 
     init {

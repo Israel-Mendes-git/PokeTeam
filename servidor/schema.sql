@@ -5,6 +5,7 @@ CREATE TABLE IF NOT EXISTS usuarios (
   apelido TEXT NOT NULL,
   foto TEXT,                       -- URL (Google) ou chave no R2 ("r2:...")
   codigo TEXT NOT NULL UNIQUE,     -- código de amizade, ex.: K7QX2M
+  favoritos TEXT NOT NULL DEFAULT '[]', -- ids dos pokémons favoritos (JSON), visíveis aos amigos
   criado_em INTEGER NOT NULL
 );
 

@@ -182,7 +182,7 @@ class MainActivity : ComponentActivity() {
                         composable("escolher/{id}") { entrada ->
                             val id = entrada.arguments?.getString("id").orEmpty()
                             val vm: PokedexViewModel = viewModel(factory = viewModelFactory {
-                                initializer { PokedexViewModel(pokedex, regraAtiva, app.prefs.favoritos) }
+                                initializer { PokedexViewModel(pokedex, regraAtiva, app.prefs.favoritos, favoritosPrimeiro = true) }
                             })
                             val lista by times.todos.collectAsStateWithLifecycle()
                             val time = lista?.firstOrNull { it.id == id }

@@ -19,6 +19,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
@@ -81,6 +82,8 @@ fun AmigosScreen(vm: AmigosViewModel, aoAbrirAmigo: (Int) -> Unit) {
     val eu by vm.eu.collectAsStateWithLifecycle()
     val ocupado by vm.ocupado.collectAsStateWithLifecycle()
     val mensagem by vm.mensagem.collectAsStateWithLifecycle()
+    // Pedidos e amigos novos chegam do servidor: atualiza sempre que a aba aparece.
+    LaunchedEffect(Unit) { vm.atualizar() }
 
     Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState())) {
         TituloPixel("Amigos", Modifier.padding(start = 16.dp, top = 8.dp, bottom = 4.dp))
@@ -255,6 +258,18 @@ fun AmigoScreen(vm: AmigoViewModel, aoVoltar: () -> Unit) {
             Text(m, color = p.destaque, modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp))
         }
         val t = tela ?: return@Column
+        val favs = t.dados.favoritos.mapNotNull { t.pokemons[it] }
+        if (favs.isNotEmpty()) {
+            Text("★ FAVORITOS", style = MaterialTheme.typography.titleSmall, color = p.destaque,
+                modifier = Modifier.padding(start = 16.dp, top = 12.dp, bottom = 6.dp))
+            Row(Modifier.horizontalScroll(rememberScrollState()).padding(horizontal = 12.dp), horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                favs.forEach { pk -> Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.width(60.dp)) {
+                    Sprite(pk, 52)
+                    Text(pk.nome, style = MaterialTheme.typography.labelSmall, maxLines = 1)
+                } }
+            }
+        }
+        Text("TIMES", style = MaterialTheme.typography.titleSmall, modifier = Modifier.padding(start = 16.dp, top = 16.dp))
         if (t.dados.times.isEmpty()) Text("Nenhum time compartilhado ainda.", color = p.sub, modifier = Modifier.padding(16.dp))
         t.dados.times.forEachIndexed { i, time ->
             CaixaPixel(Modifier.padding(12.dp).fillMaxWidth()) {
