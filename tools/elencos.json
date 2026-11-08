@@ -1,0 +1,16 @@
+{
+  "_leia": "Cada item vira assets/elencos/<saida>.json e aparece em \"Novo pool\" no app. Rode: python tools/gerar_elencos.py",
+  "elencos": [
+    {
+      "saida": "cobbleverse",
+      "nome": "COBBLEVERSE {versao}",
+      "modrinth": "cobbleverse",
+      "versao": "mais-recente"
+    }
+  ],
+  "_exemplos": [
+    {"saida": "cobblemon-oficial", "nome": "Cobblemon Official {versao}", "modrinth": "cobblemon-fabric", "versao": "mais-recente"},
+    {"saida": "meu-servidor", "nome": "Meu servidor", "pasta": "C:/caminho/da/instancia"}
+  ],
+  "palavras_mods": ["cobblemon", "mega", "mon", "poke", "legend", "raid", "pseudo"]
+}

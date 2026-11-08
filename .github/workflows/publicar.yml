@@ -1,0 +1,58 @@
+# Publica uma versão nova: git tag v0.3.0 -m "o que mudou" && git push origin v0.3.0
+# Roda os testes, compila o APK assinado e cria a Release; o app dos usuários acha sozinho.
+name: Publicar versão
+
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: write
+
+jobs:
+  publicar:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - uses: android-actions/setup-android@v3
+
+      - name: Chave de assinatura
+        env:
+          KEYSTORE_B64: ${{ secrets.POKETEAM_KEYSTORE_B64 }}
+        run: |
+          if [ -z "$KEYSTORE_B64" ]; then
+            echo "::error::Falta o segredo POKETEAM_KEYSTORE_B64 (veja tools/configurar_segredos.sh). Sem a chave, a atualização no celular falharia."
+            exit 1
+          fi
+          echo "$KEYSTORE_B64" | base64 -d > "$RUNNER_TEMP/poketeam.jks"
+
+      - name: Testes e APK
+        env:
+          VERSAO: ${{ github.ref_name }}
+          POKETEAM_KEYSTORE: ${{ runner.temp }}/poketeam.jks
+          POKETEAM_KEYSTORE_SENHA: ${{ secrets.POKETEAM_KEYSTORE_SENHA }}
+          POKETEAM_KEY_ALIAS: poketeam
+        run: |
+          chmod +x gradlew
+          ./gradlew --no-daemon testDebugUnitTest assembleRelease
+          cp app/build/outputs/apk/release/app-release.apk "PokeTeam-${GITHUB_REF_NAME}.apk"
+
+      - name: Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          # Notas: a mensagem da tag anotada; se não houver, as geradas pelo GitHub.
+          git tag -l --format='%(contents)' "$GITHUB_REF_NAME" > notas.md
+          if [ -s notas.md ]; then
+            gh release create "$GITHUB_REF_NAME" "PokeTeam-${GITHUB_REF_NAME}.apk" --title "PokeTeam ${GITHUB_REF_NAME}" --notes-file notas.md
+          else
+            gh release create "$GITHUB_REF_NAME" "PokeTeam-${GITHUB_REF_NAME}.apk" --title "PokeTeam ${GITHUB_REF_NAME}" --generate-notes
+          fi
