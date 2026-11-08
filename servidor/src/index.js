@@ -1,7 +1,7 @@
 // Servidor de amigos do PokeTeam: login com Google, perfil (apelido e foto), amizades por código
-// e times compartilhados. Cloudflare Workers + D1 (banco) + R2 (fotos).
+// e times compartilhados. Cloudflare Workers + D1 (banco e fotos).
 
-const MAX_FOTO = 300 * 1024;          // a foto chega reduzida do app (~20 KB); isto é só um teto
+const MAX_FOTO = 200 * 1024;          // a foto chega reduzida do app (~20 KB); isto é só um teto
 const MAX_TIME = 32 * 1024;
 const MAX_TIMES_POR_USUARIO = 50;
 const LETRAS_CODIGO = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"; // sem 0/O e 1/I para não confundir
@@ -144,8 +144,8 @@ async function sair(req, env) {
 
 async function apagarConta(env, eu) {
   const u = await env.DB.prepare("SELECT foto FROM usuarios WHERE id = ?").bind(eu).first();
-  if (u?.foto?.startsWith("r2:")) await env.FOTOS.delete(u.foto.slice(3));
   await env.DB.batch([
+    env.DB.prepare("DELETE FROM fotos WHERE usuario = ?").bind(eu),
     env.DB.prepare("DELETE FROM sessoes WHERE usuario = ?").bind(eu),
     env.DB.prepare("DELETE FROM amizades WHERE de = ? OR para = ?").bind(eu, eu),
     env.DB.prepare("DELETE FROM times WHERE dono = ?").bind(eu),
@@ -188,17 +188,19 @@ async function mudarFoto(req, env, eu, url) {
   if (bytes.byteLength > MAX_FOTO) throw new ErroHttp(413, "Foto grande demais");
   const antiga = await env.DB.prepare("SELECT foto FROM usuarios WHERE id = ?").bind(eu).first();
   const chave = `${eu}-${aleatorio(8)}`;
-  await env.FOTOS.put(chave, bytes, { httpMetadata: { contentType: tipo } });
-  await env.DB.prepare("UPDATE usuarios SET foto = ? WHERE id = ?").bind("r2:" + chave, eu).run();
-  if (antiga?.foto?.startsWith("r2:")) await env.FOTOS.delete(antiga.foto.slice(3));
+  await env.DB.batch([
+    env.DB.prepare("INSERT INTO fotos (chave, usuario, tipo, dados) VALUES (?, ?, ?, ?)").bind(chave, eu, tipo, bytes),
+    env.DB.prepare("UPDATE usuarios SET foto = ? WHERE id = ?").bind("r2:" + chave, eu),
+    ...(antiga?.foto?.startsWith("r2:") ? [env.DB.prepare("DELETE FROM fotos WHERE chave = ?").bind(antiga.foto.slice(3))] : []),
+  ]);
   return json(await perfil(env, eu, true, url.origin));
 }
 
 async function servirFoto(env, chave) {
-  const obj = await env.FOTOS.get(chave);
-  if (!obj) throw new ErroHttp(404, "Foto não encontrada");
-  return new Response(obj.body, {
-    headers: { "content-type": obj.httpMetadata?.contentType || "image/jpeg", "cache-control": "public, max-age=31536000, immutable" },
+  const f = await env.DB.prepare("SELECT tipo, dados FROM fotos WHERE chave = ?").bind(chave).first();
+  if (!f) throw new ErroHttp(404, "Foto não encontrada");
+  return new Response(new Uint8Array(f.dados), {
+    headers: { "content-type": f.tipo, "cache-control": "public, max-age=31536000, immutable" },
   });
 }
 

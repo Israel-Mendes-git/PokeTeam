@@ -8,6 +8,14 @@ CREATE TABLE IF NOT EXISTS usuarios (
   criado_em INTEGER NOT NULL
 );
 
+-- Fotos de perfil (já chegam reduzidas pelo app, ~20 KB). Ficam no D1 para não depender do R2.
+CREATE TABLE IF NOT EXISTS fotos (
+  chave TEXT PRIMARY KEY,
+  usuario INTEGER NOT NULL REFERENCES usuarios(id) ON DELETE CASCADE,
+  tipo TEXT NOT NULL,
+  dados BLOB NOT NULL
+);
+
 -- Sessão do app: guardamos só o hash do token.
 CREATE TABLE IF NOT EXISTS sessoes (
   hash TEXT PRIMARY KEY,
