@@ -77,4 +77,18 @@ class SorteioTest {
         val res = Sorteio.sortear(semFada, emptyList(), RegrasSorteio(tiposObrigatorios = setOf("fairy")), random = Random(1))
         assertEquals(setOf(Tipo.FADA), res.tiposFaltando)
     }
+
+    @Test
+    fun monotypeSoTipoEscolhidoEPermiteRepetir() {
+        val agua = listOf(
+            poke(1, AGUA), poke(2, AGUA, VOADOR), poke(3, AGUA, TERRESTRE), poke(4, AGUA, GELO),
+            poke(5, AGUA, SOMBRIO), poke(6, AGUA, ACO), poke(7, FOGO), poke(8, PLANTA),
+        )
+        val r = Sorteio.sortear(agua, emptyList(), RegrasSorteio(soFinais = false, monotipo = AGUA.chave), random = Random(3))
+        assertEquals(6, r.time.size)
+        assertTrue(r.time.all { AGUA in it.tipos })
+        // segundo tipo não repete
+        val segundos = r.time.flatMap { it.tipos - AGUA }
+        assertEquals(segundos.size, segundos.toSet().size)
+    }
 }

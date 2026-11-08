@@ -47,6 +47,7 @@ class Sorteador(
             doFormato = c.formatoSmogon?.let { builds.idsDoFormato(it) }.orEmpty(),
             favoritos = if (c.preferirFavoritos) favoritos.value else emptySet(),
             semTipoRepetido = c.usarRegrasDoSorteio && r.semTipoRepetido,
+            tipoLivre = if (c.usarRegrasDoSorteio) r.tipoMono else null,
             tiposObrigatorios = if (c.usarRegrasDoSorteio) r.obrigatorios else emptySet(),
         )
         return candidatos to ajustes

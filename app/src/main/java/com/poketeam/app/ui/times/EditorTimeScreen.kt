@@ -23,6 +23,10 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Share
+import androidx.compose.material.icons.filled.DeleteSweep
+import androidx.compose.material.icons.automirrored.filled.Undo
+import androidx.compose.material3.TextButton
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.style.TextAlign
@@ -137,8 +141,27 @@ fun EditorTimeScreen(
             ) { Icon(Icons.Default.Share, "Compartilhar time") }
         }
 
-        Text("${t.pokemons.size} de ${Time.MAXIMO}", style = MaterialTheme.typography.labelMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(start = 16.dp, top = 8.dp))
+        val podeDesfazer by vm.podeDesfazer.collectAsStateWithLifecycle()
+        Row(Modifier.fillMaxWidth().padding(start = 16.dp, end = 8.dp, top = 4.dp), verticalAlignment = Alignment.CenterVertically) {
+            Text(
+                if (podeDesfazer) "Time limpo" else "${t.pokemons.size} de ${Time.MAXIMO}",
+                style = MaterialTheme.typography.labelMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.weight(1f),
+            )
+            if (podeDesfazer) {
+                TextButton(onClick = { vm.desfazerLimpar() }) {
+                    Icon(Icons.AutoMirrored.Filled.Undo, null, Modifier.size(18.dp))
+                    Spacer(Modifier.width(4.dp))
+                    Text("DESFAZER")
+                }
+            } else if (t.pokemons.isNotEmpty()) {
+                TextButton(onClick = { vm.limpar() }) {
+                    Icon(Icons.Default.DeleteSweep, null, Modifier.size(18.dp))
+                    Spacer(Modifier.width(4.dp))
+                    Text("LIMPAR TIME")
+                }
+            }
+        }
 
         val megas by vm.megasDoTime.collectAsStateWithLifecycle()
         // 6 vagas em 3 colunas, dentro da caixa pixel

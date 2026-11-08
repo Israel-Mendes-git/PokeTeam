@@ -122,7 +122,7 @@ class EditorTimeViewModel(
             else sorteador.paraRecomendar().let { (candidatos, ajustes) -> Sugestoes.para(t.pokemons, candidatos, 6, ajustes) }
         }.flowOn(Dispatchers.Default).stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
 
-    fun adicionar(p: Pokemon) = viewModelScope.launch { times.adicionarMembro(id, p.id) }
+    fun adicionar(p: Pokemon) = viewModelScope.launch { esquecerDesfazer(); times.adicionarMembro(id, p.id) }
 
     /** Builds de cada membro do time (id do pokémon -> builds do Smogon). */
     /** Build padrão de cada membro: a primeira do formato escolhido no Recomendar, se houver. */
@@ -155,6 +155,7 @@ class EditorTimeViewModel(
 
     /** Completa as vagas vazias com a recomendação (cobertura de tipos + força no Smogon), no pool ativo. */
     fun recomendar() = viewModelScope.launch {
+        esquecerDesfazer()
         val t = time.value ?: return@launch
         val (candidatos, ajustes) = sorteador.paraRecomendar()
         val completo = Sugestoes.completar(t.pokemons, candidatos, ajustes)
@@ -193,6 +194,7 @@ class EditorTimeViewModel(
     fun avisoVisto() { _aviso.value = null }
 
     fun sortear() = viewModelScope.launch {
+        esquecerDesfazer()
         _sorteando.value = true
         val r = sorteador.completar(id)
         _sorteando.value = false
@@ -214,4 +216,27 @@ class EditorTimeViewModel(
     }
 
     fun descartarSeVazio() = times.descartarSeVazio(id)
+
+    // Limpar o time inteiro de uma vez, com "Desfazer" logo em seguida.
+    private var antesDeLimpar: Time? = null
+    private val _podeDesfazer = MutableStateFlow(false)
+    val podeDesfazer: StateFlow<Boolean> = _podeDesfazer
+
+    fun limpar() = viewModelScope.launch {
+        val atual = time.value?.time ?: return@launch
+        if (atual.membros.isEmpty()) return@launch
+        antesDeLimpar = atual
+        _aviso.value = null
+        times.atualizar(id) { it.copy(membros = emptyList(), builds = emptyMap(), mega = null) }
+        _podeDesfazer.value = true
+    }
+
+    fun desfazerLimpar() = viewModelScope.launch {
+        val antes = antesDeLimpar ?: return@launch
+        times.atualizar(id) { it.copy(membros = antes.membros, builds = antes.builds, mega = antes.mega) }
+        antesDeLimpar = null
+        _podeDesfazer.value = false
+    }
+
+    fun esquecerDesfazer() { antesDeLimpar = null; _podeDesfazer.value = false }
 }

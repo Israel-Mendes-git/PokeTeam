@@ -28,6 +28,7 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -55,15 +56,34 @@ fun PainelConfigSorteio(vm: EditorTimeViewModel, abaInicial: Int = 0, aoFechar: 
         Column(
             Modifier.verticalScroll(rememberScrollState()).padding(horizontal = 20.dp).navigationBarsPadding().padding(bottom = 24.dp)
         ) {
-            if (aba == 0) AbaSortear(regras, vm::mudarRegras) else AbaRecomendar(reco, vm::mudarRecomendar)
+            if (aba == 0) AbaSortear(regras, vm::mudarRegras, aoLigarMonotype = {
+                // Sem formato escolhido, o monotype puxa as builds do Monotype do Smogon.
+                if (reco.formato == null) vm.mudarRecomendar { it.copy(formato = FormatoSmogon.MONOTYPE.name) }
+            }) else AbaRecomendar(reco, vm::mudarRecomendar)
         }
     }
 }
 
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
-private fun AbaSortear(r: RegrasSorteio, mudar: ((RegrasSorteio) -> RegrasSorteio) -> Unit) {
+private fun AbaSortear(r: RegrasSorteio, mudar: ((RegrasSorteio) -> RegrasSorteio) -> Unit, aoLigarMonotype: () -> Unit) {
     val p = LocalPaleta.current
+    Titulo("Monotype")
+    Text(
+        if (r.monotipo == null) "Escolha um tipo e todo o time terá esse tipo (o segundo tipo é livre)."
+        else "Todo membro tem ${r.tipoMono?.nome ?: ""}. O Recomendar usa o segundo tipo para cobrir as fraquezas.",
+        color = p.sub, style = MaterialTheme.typography.bodySmall, modifier = Modifier.padding(bottom = 8.dp),
+    )
+    FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+        ChipTexto("DESLIGADO", r.monotipo == null) { mudar { it.copy(monotipo = null) } }
+        Tipo.entries.forEach { t ->
+            ChipTipo(t, if (r.monotipo == t.chave) 1 else 0) {
+                if (r.monotipo == null) aoLigarMonotype()
+                mudar { it.copy(monotipo = if (it.monotipo == t.chave) null else t.chave) }
+            }
+        }
+    }
+
     Titulo("Quem pode sair")
     Linha("Só evolução final", "Nada de Caterpie no time", r.soFinais) { mudar { it.copy(soFinais = !it.soFinais) } }
     Linha("Sem lendários e míticos", null, r.semLendarios) { mudar { it.copy(semLendarios = !it.semLendarios) } }
@@ -99,7 +119,11 @@ private fun AbaSortear(r: RegrasSorteio, mudar: ((RegrasSorteio) -> RegrasSortei
     }
 
     Titulo("Montagem")
-    Linha("Sem tipo repetido", "Cada tipo aparece em um membro só", r.semTipoRepetido) { mudar { it.copy(semTipoRepetido = !it.semTipoRepetido) } }
+    Linha(
+        "Sem tipo repetido",
+        if (r.monotipo != null) "No monotype, vale para o segundo tipo" else "Cada tipo aparece em um membro só",
+        r.semTipoRepetido,
+    ) { mudar { it.copy(semTipoRepetido = !it.semTipoRepetido) } }
     Linha("Evitar fraquezas graves", "Testa várias combinações e fica com a mais equilibrada", r.evitarFraquezas) {
         mudar { it.copy(evitarFraquezas = !it.evitarFraquezas) } }
 }
@@ -164,12 +188,26 @@ private fun Titulo(t: String) {
 }
 
 @Composable
-private fun Linha(titulo: String, descricao: String?, ligado: Boolean, alternar: () -> Unit) {
-    Row(Modifier.fillMaxWidth().clickable(onClick = alternar).padding(vertical = 6.dp), verticalAlignment = Alignment.CenterVertically) {
+private fun Linha(titulo: String, descricao: String?, ligado: Boolean, habilitado: Boolean = true, alternar: () -> Unit) {
+    Row(
+        Modifier.fillMaxWidth().clickable(enabled = habilitado, onClick = alternar).padding(vertical = 6.dp)
+            .alpha(if (habilitado) 1f else 0.45f),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
         Column(Modifier.weight(1f)) {
             Text(titulo, style = MaterialTheme.typography.bodyLarge)
             if (descricao != null) Text(descricao, style = MaterialTheme.typography.bodySmall, color = LocalPaleta.current.sub)
         }
-        Switch(checked = ligado, onCheckedChange = { alternar() })
+        Switch(checked = ligado, onCheckedChange = { alternar() }, enabled = habilitado)
+    }
+}
+
+@Composable
+private fun ChipTexto(texto: String, marcado: Boolean, aoClicar: () -> Unit) {
+    val p = LocalPaleta.current
+    Row(
+        Modifier.background(if (marcado) p.texto else p.vaga).clickable(onClick = aoClicar).padding(horizontal = 8.dp, vertical = 5.dp),
+    ) {
+        Text(texto, color = if (marcado) p.fundo else p.texto, fontSize = 13.sp, fontWeight = FontWeight.Bold)
     }
 }

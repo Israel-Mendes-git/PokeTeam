@@ -19,7 +19,12 @@ data class RegrasSorteio(
     val tiposObrigatorios: Set<String> = emptySet(),
     /** Chaves de [Tipo]: nenhum membro sorteado pode ter. */
     val tiposProibidos: Set<String> = emptySet(),
+    /** Chave de [Tipo]: todo membro precisa ter esse tipo (o segundo tipo é livre). Com [semTipoRepetido], o que não repete é o segundo tipo. */
+    val monotipo: String? = null,
 ) {
+    val tipoMono: Tipo? get() = monotipo?.let { runCatching { Tipo.daChave(it) }.getOrNull() }
+
+
     val obrigatorios: Set<Tipo> get() = tiposObrigatorios.mapNotNull { runCatching { Tipo.daChave(it) }.getOrNull() }.toSet()
 
     /** Filtros que valem para cada candidato isoladamente (o resto depende do time inteiro). */
@@ -28,11 +33,12 @@ data class RegrasSorteio(
             (!soFavoritos || p.id in favoritos) &&
             (!semLendarios || !(p.lendario || p.mitico)) &&
             p.total >= totalMinimo &&
-            p.chavesTipos.none { it in tiposProibidos }
+            p.chavesTipos.none { it in tiposProibidos } &&
+            (monotipo == null || monotipo in p.chavesTipos)
 
     /** Quantas regras fogem do padrão (para mostrar no botão). */
     val ativas: Int
-        get() = listOf(!soFinais, !semTipoRepetido, !evitarFraquezas, soFavoritos, semLendarios, totalMinimo > 0).count { it } +
+        get() = listOf(!soFinais, !semTipoRepetido, !evitarFraquezas, soFavoritos, semLendarios, totalMinimo > 0, monotipo != null).count { it } +
             tiposObrigatorios.size + tiposProibidos.size
 }
 
@@ -89,7 +95,7 @@ object Sorteio {
         obrigatorios - time.flatMap { it.tipos }.toSet()
 
     private fun cabe(time: List<Pokemon>, c: Pokemon, regras: RegrasSorteio) =
-        time.none { it.dex == c.dex } && !(regras.semTipoRepetido && time.any { m -> m.tipos.any { it in c.tipos } })
+        time.none { it.dex == c.dex } && !(regras.semTipoRepetido && time.any { m -> m.tipos.any { it != regras.tipoMono && it in c.tipos } })
 
     private fun montar(
         embaralhados: List<Pokemon>,

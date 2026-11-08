@@ -60,6 +60,8 @@ data class AjustesSugestao(
     val doFormato: Set<Int> = emptySet(),
     val favoritos: Set<Int> = emptySet(),
     val semTipoRepetido: Boolean = false,
+    /** Tipo que pode repetir mesmo com [semTipoRepetido] (o tipo do monotype). */
+    val tipoLivre: Tipo? = null,
     val tiposObrigatorios: Set<Tipo> = emptySet(),
 )
 
@@ -105,7 +107,7 @@ object Sugestoes {
 
         return candidatos.asSequence()
             .filter { it.dex !in dexNoTime }
-            .filter { c -> !ajustes.semTipoRepetido || c.tipos.none { it in tiposNoTime } }
+            .filter { c -> !ajustes.semTipoRepetido || c.tipos.none { it != ajustes.tipoLivre && it in tiposNoTime } }
             .map { c ->
                 val depois = AnaliseTime.de(time + c)
                 val problemasDepois = depois.problemas.map { it.tipo }.toSet()
