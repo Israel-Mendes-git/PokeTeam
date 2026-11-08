@@ -40,6 +40,9 @@ jobs:
           POKETEAM_KEYSTORE: ${{ runner.temp }}/poketeam.jks
           POKETEAM_KEYSTORE_SENHA: ${{ secrets.POKETEAM_KEYSTORE_SENHA }}
           POKETEAM_KEY_ALIAS: poketeam
+          # Amigos: endereço do servidor e Client ID do Google (vazios = aba Amigos desligada no build).
+          POKETEAM_SERVIDOR: ${{ secrets.POKETEAM_SERVIDOR }}
+          POKETEAM_GOOGLE_CLIENT_ID: ${{ secrets.POKETEAM_GOOGLE_CLIENT_ID }}
         run: |
           chmod +x gradlew
           ./gradlew --no-daemon testDebugUnitTest assembleRelease
