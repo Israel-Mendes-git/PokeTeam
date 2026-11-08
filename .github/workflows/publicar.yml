@@ -50,6 +50,8 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           # Notas: a mensagem da tag anotada; se não houver, as geradas pelo GitHub.
+          # O checkout traz a tag sem a mensagem; busca a tag anotada de novo.
+          git fetch --force origin "refs/tags/$GITHUB_REF_NAME:refs/tags/$GITHUB_REF_NAME"
           git tag -l --format='%(contents)' "$GITHUB_REF_NAME" > notas.md
           if [ -s notas.md ]; then
             gh release create "$GITHUB_REF_NAME" "PokeTeam-${GITHUB_REF_NAME}.apk" --title "PokeTeam ${GITHUB_REF_NAME}" --notes-file notas.md
