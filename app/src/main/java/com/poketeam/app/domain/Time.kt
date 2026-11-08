@@ -9,6 +9,8 @@ data class Time(
     /** ids de [Pokemon], no máximo [MAXIMO]. */
     val membros: List<Int> = emptyList(),
     val favorito: Boolean = false,
+    /** Build escolhida de cada membro: id do pokémon -> índice na lista de builds dele. */
+    val builds: Map<Int, Int> = emptyMap(),
     val criadoEm: Long,
     val alteradoEm: Long = criadoEm,
 ) {

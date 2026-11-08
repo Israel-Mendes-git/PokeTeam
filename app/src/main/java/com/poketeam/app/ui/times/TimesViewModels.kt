@@ -5,6 +5,8 @@ import androidx.lifecycle.viewModelScope
 import com.poketeam.app.data.Pokedex
 import com.poketeam.app.data.Times
 import com.poketeam.app.data.Pools
+import com.poketeam.app.data.Builds
+import com.poketeam.app.domain.Build
 import com.poketeam.app.domain.Sugestao
 import com.poketeam.app.domain.Sugestoes
 import kotlinx.coroutines.flow.combine
@@ -53,7 +55,8 @@ class EditorTimeViewModel(
     private val times: Times,
     private val pokedex: Pokedex,
     private val sorteador: Sorteador,
-    pools: Pools,
+    private val pools: Pools,
+    private val builds: Builds,
 ) : ViewModel() {
     val time: StateFlow<TimeResolvido?> = times.todos
         .map { l -> l?.firstOrNull { it.id == id }?.let { pokedex.resolver(it) } }
@@ -65,10 +68,31 @@ class EditorTimeViewModel(
     /** Quem do pool ativo mais fecha os pontos fracos do time (vazio se o time está vazio ou cheio). */
     val sugestoes: StateFlow<List<Sugestao>> = combine(time, pools.ativo, sorteador.regras) { t, pool, regras ->
         if (t == null) emptyList()
-        else Sugestoes.para(t.pokemons, pokedex.todos().filter { pool.permite(it) && (!regras.soFinais || it.final) })
+        else Sugestoes.para(t.pokemons, pokedex.todos().filter { pool.permite(it) && (!regras.soFinais || it.final) },
+            forca = builds.todasForcas())
     }.flowOn(Dispatchers.Default).stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
 
     fun adicionar(p: Pokemon) = viewModelScope.launch { times.adicionarMembro(id, p.id) }
+
+    /** Builds de cada membro do time (id do pokémon -> builds do Smogon). */
+    val buildsDoTime: StateFlow<Map<Int, List<Build>>> = time
+        .map { t -> t?.pokemons.orEmpty().associate { it.id to builds.de(it.id) } }
+        .flowOn(Dispatchers.Default)
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyMap())
+
+    fun escolherBuild(pokemonId: Int, indice: Int) = viewModelScope.launch {
+        times.atualizar(id) { t -> t.copy(builds = t.builds + (pokemonId to indice)) }
+    }
+
+    /** Completa as vagas vazias com a recomendação (cobertura de tipos + força no Smogon), no pool ativo. */
+    fun recomendar() = viewModelScope.launch {
+        val t = time.value ?: return@launch
+        val regras = sorteador.regras.value
+        val pool = pools.ativo.value
+        val candidatos = pokedex.todos().filter { pool.permite(it) && (!regras.soFinais || it.final) }
+        val completo = Sugestoes.completar(t.pokemons, candidatos, builds.todasForcas())
+        times.atualizar(id) { it.copy(membros = completo.map { p -> p.id }) }
+    }
 
     /** Time em texto para mandar aos amigos; os nomes seguem o formato de importação do Showdown. */
     fun textoParaCompartilhar(): String? {
@@ -76,7 +100,13 @@ class EditorTimeViewModel(
         return buildString {
             appendLine(t.time.nome)
             appendLine()
-            t.pokemons.forEach { appendLine(it.nomeShowdown); appendLine() }
+            val bs = buildsDoTime.value
+            t.pokemons.forEach { p ->
+                val lista = bs[p.id].orEmpty()
+                val b = lista.getOrNull(t.time.builds[p.id] ?: 0)
+                appendLine(b?.paraShowdown(p.nomeShowdown) ?: p.nomeShowdown)
+                appendLine()
+            }
         }.trimEnd()
     }
     fun mudarRegras(f: (RegrasSorteio) -> RegrasSorteio) = sorteador.mudarRegras(f)

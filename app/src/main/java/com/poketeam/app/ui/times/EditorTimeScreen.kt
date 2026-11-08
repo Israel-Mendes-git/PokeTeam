@@ -67,6 +67,10 @@ import com.poketeam.app.ui.pokedex.BarraStat
 import com.poketeam.app.ui.pokedex.Sprite
 import com.poketeam.app.ui.tema.SeloTipo
 import com.poketeam.app.ui.tema.LocalPaleta
+import com.poketeam.app.domain.Build
+import com.poketeam.app.ui.builds.CartaoBuild
+import androidx.compose.material.icons.filled.AutoAwesome
+import androidx.compose.material3.rememberModalBottomSheetState
 import com.poketeam.app.ui.tema.BotaoPixel
 import com.poketeam.app.ui.tema.CaixaPixel
 import androidx.compose.foundation.layout.PaddingValues
@@ -154,6 +158,9 @@ fun EditorTimeScreen(
         val sugestoes by vm.sugestoes.collectAsStateWithLifecycle()
         if (sugestoes.isNotEmpty()) FaixaSugestoes(sugestoes, temProblemas = t.analise.problemas.isNotEmpty(), aoEscolher = vm::adicionar)
 
+        val buildsDoTime by vm.buildsDoTime.collectAsStateWithLifecycle()
+        if (t.pokemons.isNotEmpty()) BuildsDoTime(t, buildsDoTime, vm::escolherBuild)
+
         if (t.pokemons.isNotEmpty()) Detalhes(t.analise)
         Spacer(Modifier.height(24.dp))
     }
@@ -170,19 +177,31 @@ private fun BarraSorteio(vm: EditorTimeViewModel, cheio: Boolean, nomePool: Stri
     Column(Modifier.padding(horizontal = 12.dp)) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             BotaoPixel(
-                onClick = { vm.avisoVisto(); vm.sortear() },
+                onClick = { vm.avisoVisto(); vm.recomendar() },
                 enabled = !cheio && !sorteando,
                 modifier = Modifier.weight(1f),
             ) {
+                Icon(Icons.Default.AutoAwesome, null)
+                Spacer(Modifier.width(6.dp))
+                Text(if (cheio) "COMPLETO" else "RECOMENDAR", style = MaterialTheme.typography.titleSmall)
+            }
+            Spacer(Modifier.width(6.dp))
+            BotaoPixel(
+                onClick = { vm.avisoVisto(); vm.sortear() },
+                enabled = !cheio && !sorteando,
+                modifier = Modifier.weight(1f),
+                cor = LocalPaleta.current.painel,
+                corTexto = LocalPaleta.current.texto,
+            ) {
                 Icon(Icons.Default.Casino, null)
-                Spacer(Modifier.width(8.dp))
-                Text(if (cheio) "TIME COMPLETO" else "SORTEAR VAGAS", style = MaterialTheme.typography.titleSmall)
+                Spacer(Modifier.width(6.dp))
+                Text("SORTEAR", style = MaterialTheme.typography.titleSmall)
             }
             IconButton(onClick = { mostrarRegras = true }) { Icon(Icons.Default.Tune, "Regras do sorteio") }
         }
         Text(
-            if (cheio) "Tire alguém do time para sortear de novo essa vaga."
-            else "Sorteia do pool $nomePool e mantém quem já está no time.",
+            if (cheio) "Tire alguém do time para trocar essa vaga."
+            else "Recomendar completa com quem fecha os pontos fracos e é forte no Smogon; sortear é na sorte. Pool: $nomePool.",
             style = MaterialTheme.typography.labelSmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             modifier = Modifier.padding(start = 4.dp, top = 4.dp),
@@ -218,6 +237,50 @@ private fun LinhaRegra(titulo: String, descricao: String, ligado: Boolean, alter
             Text(descricao, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
         Switch(checked = ligado, onCheckedChange = { alternar() })
+    }
+}
+
+/** Build escolhida de cada membro (a primeira do Smogon por padrão); tocar abre as outras. */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun BuildsDoTime(t: TimeResolvido, builds: Map<Int, List<Build>>, aoEscolher: (Int, Int) -> Unit) {
+    var aberto by remember { mutableStateOf<Pokemon?>(null) }
+    val paleta = LocalPaleta.current
+    Text("BUILDS DO TIME", style = MaterialTheme.typography.titleSmall, modifier = Modifier.padding(start = 16.dp, top = 20.dp, bottom = 6.dp))
+    Column(Modifier.padding(horizontal = 12.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+        t.pokemons.forEach { p ->
+            val lista = builds[p.id].orEmpty()
+            val b = lista.getOrNull(t.time.builds[p.id] ?: 0)
+            Row(
+                Modifier.fillMaxWidth().background(paleta.painel).clickable(enabled = lista.isNotEmpty()) { aberto = p }.padding(8.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Sprite(p, 44)
+                Column(Modifier.weight(1f).padding(start = 8.dp)) {
+                    Text(p.nome, style = MaterialTheme.typography.titleSmall)
+                    if (b == null) Text("Sem build no Smogon", color = paleta.sub, style = MaterialTheme.typography.bodySmall)
+                    else {
+                        Text("${b.nome} · ${b.formato}", color = paleta.sub, style = MaterialTheme.typography.bodySmall, maxLines = 1,
+                            overflow = TextOverflow.Ellipsis)
+                        Text(b.golpes.joinToString(" · ") { it.first() }, style = MaterialTheme.typography.bodySmall, maxLines = 1,
+                            overflow = TextOverflow.Ellipsis)
+                    }
+                }
+                if (lista.size > 1) Text("${lista.size} ▸", color = paleta.acento, style = MaterialTheme.typography.labelLarge)
+            }
+        }
+    }
+    aberto?.let { p ->
+        val lista = builds[p.id].orEmpty()
+        ModalBottomSheet(onDismissRequest = { aberto = null }, sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)) {
+            Column(Modifier.verticalScroll(rememberScrollState()).padding(horizontal = 12.dp).padding(bottom = 24.dp),
+                verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                Text("BUILDS DE ${p.nome.uppercase()}", style = MaterialTheme.typography.titleMedium)
+                lista.forEachIndexed { i, b ->
+                    CartaoBuild(b, escolhida = i == (t.time.builds[p.id] ?: 0)) { aoEscolher(p.id, i); aberto = null }
+                }
+            }
+        }
     }
 }
 

@@ -66,20 +66,20 @@ private fun Miniatura(p: Paleta, escolhida: Boolean, aoClicar: () -> Unit) {
             .clickable(onClick = aoClicar)
     ) {
         Column(Modifier.fillMaxWidth().background(p.fundo).padding(10.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            Text("▶ ${p.nome.uppercase()}", color = p.destaque, fontSize = 13.sp, fontWeight = FontWeight.Bold,
+            Text("▶ ${p.nome.uppercase()}", color = p.destaque, fontSize = 17.sp, fontWeight = FontWeight.Bold,
                 style = MaterialTheme.typography.labelLarge, maxLines = 1)
             Box(Modifier.fillMaxWidth().background(p.painel).bordaPixel(p, grossura = 2.dp).padding(8.dp)) {
                 Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
                     repeat(3) { i -> Box(Modifier.size(22.dp).background(if (i == 2) p.fundo else p.vaga)) }
                 }
             }
-            Text("Texto · detalhe", color = p.texto, fontSize = 11.sp, style = MaterialTheme.typography.labelSmall)
+            Text("Texto · detalhe", color = p.texto, fontSize = 14.sp, style = MaterialTheme.typography.labelSmall)
             Box(Modifier.fillMaxWidth().background(p.bordaFundo)) {
-                Text("SORTEAR", color = p.textoAcento, fontSize = 11.sp, style = MaterialTheme.typography.labelSmall,
+                Text("SORTEAR", color = p.textoAcento, fontSize = 14.sp, style = MaterialTheme.typography.labelSmall,
                     modifier = Modifier.fillMaxWidth().padding(end = 3.dp, bottom = 3.dp).background(p.acento).padding(6.dp))
             }
         }
-        if (escolhida) Text("✓ EM USO", color = atual.textoAcento, fontSize = 11.sp, style = MaterialTheme.typography.labelSmall,
+        if (escolhida) Text("✓ EM USO", color = atual.textoAcento, fontSize = 14.sp, style = MaterialTheme.typography.labelSmall,
             modifier = Modifier.padding(start = 6.dp, top = 3.dp, bottom = 1.dp))
         else Spacer(Modifier.height(4.dp))
     }

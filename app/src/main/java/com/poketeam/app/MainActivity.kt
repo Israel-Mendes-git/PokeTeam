@@ -48,6 +48,7 @@ import com.poketeam.app.ui.tema.PokeTeamTema
 import com.poketeam.app.ui.tema.LocalPaleta
 import com.poketeam.app.ui.tema.Paletas
 import com.poketeam.app.ui.tema.TemaScreen
+import com.poketeam.app.ui.builds.NaturesScreen
 import com.poketeam.app.ui.pokedex.SeletorPool
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
@@ -148,12 +149,17 @@ class MainActivity : ComponentActivity() {
                         composable("pokemon/{id}") { entrada ->
                             val id = entrada.arguments?.getString("id")?.toIntOrNull() ?: 0
                             val p by produceState<Pokemon?>(null, id) { value = pokedex.porId(id) }
-                            p?.let { DetalheScreen(it) { nav.popBackStack() } }
+                            val bs by produceState(emptyList<com.poketeam.app.domain.Build>(), id) { value = app.builds.de(id) }
+                            val favoritos by app.prefs.favoritos.collectAsStateWithLifecycle()
+                            p?.let {
+                                DetalheScreen(it, voltar = { nav.popBackStack() }, builds = bs, favorito = id in favoritos,
+                                    aoFavoritar = { app.prefs.alternarFavorito(id) }, aoNatures = { nav.navigate("natures") })
+                            }
                         }
                         composable("time/{id}") { entrada ->
                             val id = entrada.arguments?.getString("id").orEmpty()
                             val vm: EditorTimeViewModel = viewModel(factory = viewModelFactory {
-                                initializer { EditorTimeViewModel(id, times, pokedex, app.sorteador, pools) }
+                                initializer { EditorTimeViewModel(id, times, pokedex, app.sorteador, pools, app.builds) }
                             })
                             EditorTimeScreen(
                                 vm,
@@ -196,6 +202,7 @@ class MainActivity : ComponentActivity() {
                             })
                             PoolsScreen(vm, aoVoltar = { nav.popBackStack() }) { id -> nav.navigate("pool/$id") }
                         }
+                        composable("natures") { NaturesScreen { nav.popBackStack() } }
                         composable("tema") {
                             TemaScreen(paleta.id, aoEscolher = app.prefs::mudarTema, aoVoltar = { nav.popBackStack() }) {
                                 CaixaAtualizacao(app.atualizador)

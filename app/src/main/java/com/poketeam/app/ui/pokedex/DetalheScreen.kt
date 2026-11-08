@@ -31,12 +31,26 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.poketeam.app.domain.Pokemon
+import com.poketeam.app.domain.Build
+import com.poketeam.app.ui.builds.CartaoBuild
+import com.poketeam.app.ui.tema.LocalPaleta
+import androidx.compose.material.icons.filled.Star
+import androidx.compose.material.icons.filled.StarBorder
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.material3.TextButton
 import com.poketeam.app.domain.TabelaDeTipos
 import com.poketeam.app.domain.Tipo
 import com.poketeam.app.ui.tema.SeloTipo
 
 @Composable
-fun DetalheScreen(p: Pokemon, voltar: () -> Unit) {
+fun DetalheScreen(
+    p: Pokemon,
+    voltar: () -> Unit,
+    builds: List<Build> = emptyList(),
+    favorito: Boolean = false,
+    aoFavoritar: () -> Unit = {},
+    aoNatures: () -> Unit = {},
+) {
     Column(
         Modifier
             .fillMaxSize()
@@ -45,7 +59,14 @@ fun DetalheScreen(p: Pokemon, voltar: () -> Unit) {
             .navigationBarsPadding()
             .verticalScroll(rememberScrollState())
     ) {
-        IconButton(onClick = voltar) { Icon(Icons.AutoMirrored.Filled.ArrowBack, "Voltar") }
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            IconButton(onClick = voltar) { Icon(Icons.AutoMirrored.Filled.ArrowBack, "Voltar") }
+            Spacer(Modifier.weight(1f))
+            IconButton(onClick = aoFavoritar) {
+                Icon(if (favorito) Icons.Default.Star else Icons.Default.StarBorder, if (favorito) "Tirar dos favoritos" else "Favoritar",
+                    tint = if (favorito) LocalPaleta.current.destaque else LocalPaleta.current.sub)
+            }
+        }
         Column(Modifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally) {
             Sprite(p, 160)
             Text("#${p.dex}  ·  Geração ${p.geracao}", color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -78,6 +99,16 @@ fun DetalheScreen(p: Pokemon, voltar: () -> Unit) {
         GrupoDefesa("Resiste ½×", defesa, 0.5)
         GrupoDefesa("Resiste ¼×", defesa, 0.25)
         GrupoDefesa("Imune", defesa, 0.0)
+        Secao("Builds recomendadas (Smogon)")
+        if (builds.isEmpty()) {
+            Text("O Smogon não tem build para este pokémon.", color = LocalPaleta.current.sub,
+                style = MaterialTheme.typography.bodySmall, modifier = Modifier.padding(horizontal = 16.dp))
+        } else {
+            Column(Modifier.padding(horizontal = 12.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                builds.forEach { CartaoBuild(it) }
+            }
+        }
+        TextButton(onClick = aoNatures, modifier = Modifier.padding(start = 4.dp)) { Text("Ver tabela de natures") }
         Box(Modifier.height(24.dp))
     }
 }
@@ -98,7 +129,7 @@ fun BarraStat(nome: String, valor: Int) {
     }
     Row(Modifier.padding(horizontal = 16.dp, vertical = 3.dp), verticalAlignment = Alignment.CenterVertically) {
         Text(nome, Modifier.width(88.dp), style = MaterialTheme.typography.bodySmall)
-        Text("$valor", Modifier.width(36.dp), style = MaterialTheme.typography.bodySmall, fontWeight = FontWeight.SemiBold)
+        Text("$valor", Modifier.width(40.dp), style = MaterialTheme.typography.bodyLarge)
         Box(Modifier.weight(1f).height(8.dp).background(MaterialTheme.colorScheme.surfaceVariant, RectangleShape)) {
             Box(Modifier.fillMaxWidth((valor / 200f).coerceAtMost(1f)).height(8.dp).background(cor, RectangleShape))
         }

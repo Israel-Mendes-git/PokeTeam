@@ -19,6 +19,8 @@ data class Preferencias(
     val tema: String? = null,
     /** Última vez (ms) que o app procurou atualização. */
     val ultimaChecagem: Long = 0,
+    /** Pokémons favoritos (ids). */
+    val favoritos: Set<Int> = emptySet(),
 )
 
 /** Escolhas que o app lembra entre aberturas, em filesDir/preferencias.json. */
@@ -36,6 +38,15 @@ class Prefs(context: Context) {
     suspend fun ultimaChecagem(): Long = arquivo.alterar { it to it.ultimaChecagem }
 
     suspend fun marcarChecagem(quando: Long) = arquivo.alterar { it.copy(ultimaChecagem = quando) to Unit }
+
+    val favoritos: StateFlow<Set<Int>> = arquivo.valor.map { it?.favoritos.orEmpty() }
+        .stateIn(arquivo.escopo, SharingStarted.Eagerly, emptySet())
+
+    fun alternarFavorito(pokemonId: Int) {
+        arquivo.escopo.launch {
+            arquivo.alterar { p -> p.copy(favoritos = if (pokemonId in p.favoritos) p.favoritos - pokemonId else p.favoritos + pokemonId) to Unit }
+        }
+    }
 
     fun mudarTema(id: String) {
         arquivo.escopo.launch { arquivo.alterar { it.copy(tema = id) to Unit } }

@@ -46,17 +46,22 @@ import com.poketeam.app.domain.Tipo
 /** Paleta do tema ativo. */
 val LocalPaleta = staticCompositionLocalOf { Paletas.padrao }
 
-/** Pixelify Sans (OFL), fonte variável: um Font por peso. */
-@OptIn(ExperimentalTextApi::class)
-private val Pixel = FontFamily(
-    listOf(400, 500, 600, 700).map { w ->
-        Font(R.font.pixelify_sans, FontWeight(w), variationSettings = FontVariation.Settings(FontVariation.weight(w)))
-    }
-)
+/** Jersey 10 (OFL): pixel legível, números e letras sem ambiguidade. Um peso só; negrito é sintetizado. */
+private val Pixel = FontFamily(Font(R.font.jersey10))
 
+/**
+ * A Jersey 10 desenha menor que a fonte padrão: tudo sobe 30%. Ligaduras desligadas
+ * ("fi" e "fl" viram desenhos estranhos em fontes pixel).
+ */
 private fun tipografia(): Typography {
     val base = Typography()
-    fun TextStyle.px() = copy(fontFamily = Pixel, letterSpacing = 0.sp)
+    fun TextStyle.px() = copy(
+        fontFamily = Pixel,
+        fontSize = fontSize * 1.3f,
+        lineHeight = lineHeight * 1.2f,
+        letterSpacing = 0.5.sp,
+        fontFeatureSettings = "liga 0, clig 0",
+    )
     return Typography(
         displayLarge = base.displayLarge.px(), displayMedium = base.displayMedium.px(), displaySmall = base.displaySmall.px(),
         headlineLarge = base.headlineLarge.px(), headlineMedium = base.headlineMedium.px(), headlineSmall = base.headlineSmall.px(),
@@ -175,7 +180,7 @@ fun SeloTipo(tipo: Tipo, modifier: Modifier = Modifier, compacto: Boolean = fals
     Text(
         text = tipo.nome.uppercase(),
         color = Color.White,
-        fontSize = if (compacto) 9.sp else 12.sp,
+        fontSize = if (compacto) 11.sp else 15.sp,
         maxLines = 1,
         fontWeight = FontWeight.SemiBold,
         style = MaterialTheme.typography.labelSmall.copy(
