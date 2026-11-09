@@ -60,6 +60,36 @@ certo((await chamar("GET", `/amigos/${a.eu.id}/times`, { sessao: b.sessao })).da
 await chamar("DELETE", `/amigos/${a.eu.id}`, { sessao: b.sessao });
 certo((await chamar("GET", `/amigos/${a.eu.id}/times`, { sessao: b.sessao })).status === 403, "desfazer amizade corta acesso");
 
+// ---------- draft online ----------
+const pool = { id: "tudo", nome: "Tudo" };
+const sala = (await chamar("POST", "/salas", { sessao: a.sessao, corpo: { porJogador: 2, serpente: true, modo: "OPCOES", soFinais: true, pool } })).dados;
+certo(sala.codigo?.length === 5 && sala.estado === "espera" && sala.jogadores.length === 1, "cria sala");
+await chamar("POST", "/amigos", { sessao: a.sessao, corpo: { codigo: b.eu.codigo } });
+await chamar("POST", `/amigos/${a.eu.id}/aceitar`, { sessao: b.sessao });
+certo((await chamar("GET", "/salas", { sessao: b.sessao })).dados.abertas.some((s) => s.codigo === sala.codigo), "amiga vê a sala aberta");
+certo((await chamar("POST", `/salas/${sala.codigo}/iniciar`, { sessao: a.sessao })).status === 400, "não começa sozinha");
+const entrou = (await chamar("POST", `/salas/${sala.codigo}/entrar`, { sessao: b.sessao })).dados;
+certo(entrou.jogadores.length === 2 && entrou.jogadores[1].apelido === "Bia", "Bia entra");
+certo((await chamar("POST", `/salas/${sala.codigo}/iniciar`, { sessao: b.sessao })).status === 403, "só o anfitrião começa");
+const comecou = (await chamar("POST", `/salas/${sala.codigo}/iniciar`, { sessao: a.sessao })).dados;
+certo(comecou.estado === "andamento", "começa o draft");
+certo((await chamar("GET", `/salas/${sala.codigo}?versao=${comecou.versao}`, { sessao: b.sessao })).dados.mudou === false, "sem mudança, resposta curta");
+const esc = (s, id, dex, n) => chamar("POST", `/salas/${sala.codigo}/escolher`, { sessao: s, corpo: { pokemonId: id, dex, n } });
+certo((await esc(b.sessao, 6, 6, 0)).status === 403, "fora da vez recusado");
+certo((await esc(a.sessao, 6, 6, 0)).status === 200, "Ana escolhe na vez");
+certo((await esc(a.sessao, 9, 9, 0)).status === 409, "escolha com n velho recusada");
+certo((await esc(b.sessao, 10034, 6, 1)).status === 409, "mesma espécie (outra forma) recusada");
+await esc(b.sessao, 9, 9, 1);
+certo((await esc(a.sessao, 3, 3, 2)).status === 403, "serpente: Bia escolhe duas seguidas");
+await esc(b.sessao, 3, 3, 2);
+const fim = (await esc(a.sessao, 25, 25, 3)).dados;
+certo(fim.estado === "fim" && fim.escolhas.length === 4, "draft termina com 2 x 2");
+certo((await chamar("POST", `/salas/${sala.codigo}/desfazer`, { sessao: b.sessao })).status === 403, "só o anfitrião desfaz");
+certo((await chamar("POST", `/salas/${sala.codigo}/desfazer`, { sessao: a.sessao })).dados.estado === "andamento", "desfazer reabre o draft");
+await chamar("POST", `/salas/${sala.codigo}/sair`, { sessao: a.sessao });
+certo((await chamar("GET", `/salas/${sala.codigo}`, { sessao: b.sessao })).status === 404, "anfitrião sair encerra a sala");
+await chamar("DELETE", `/amigos/${a.eu.id}`, { sessao: b.sessao });
+
 certo((await chamar("POST", "/sair", { sessao: a.sessao })).status === 200, "sair");
 certo((await chamar("GET", "/eu", { sessao: a.sessao })).status === 401, "sessão some ao sair");
 await chamar("DELETE", "/eu", { sessao: b.sessao });

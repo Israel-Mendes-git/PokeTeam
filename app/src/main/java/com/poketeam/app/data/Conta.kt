@@ -203,7 +203,7 @@ class Conta(private val context: Context) {
 
     // ---------- HTTP ----------
 
-    private suspend fun chamar(metodo: String, caminho: String, corpo: String? = null, autenticado: Boolean = true): String =
+    internal suspend fun chamar(metodo: String, caminho: String, corpo: String? = null, autenticado: Boolean = true): String =
         chamar(metodo, caminho, corpo?.toByteArray(), "application/json", autenticado)
 
     private suspend fun chamar(

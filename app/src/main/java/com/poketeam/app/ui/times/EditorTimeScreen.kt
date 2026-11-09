@@ -164,6 +164,8 @@ fun EditorTimeScreen(
         }
 
         val megas by vm.megasDoTime.collectAsStateWithLifecycle()
+        var trocando by remember { mutableStateOf<Int?>(null) }
+        trocando?.let { i -> t.pokemons.getOrNull(i)?.let { p -> PainelTroca(vm, i, p) { trocando = null } } }
         // 6 vagas em 3 colunas, dentro da caixa pixel
         CaixaPixel(Modifier.padding(12.dp).fillMaxWidth(), preenchimento = PaddingValues(12.dp)) {
         Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -175,6 +177,7 @@ fun EditorTimeScreen(
                             if (p != null) VagaOcupada(
                                 t.emBatalha[i], megas = megas[p.id].orEmpty(), megaAtiva = t.megaAtiva?.id,
                                 aoVerFicha = { aoVerFicha(p) }, aoRemover = { vm.remover(i) }, aoMega = vm::alternarMega,
+                                aoTrocar = { trocando = i },
                             )
                             else VagaVazia(ativa = i == t.pokemons.size, aoClicar = aoAdicionar)
                         }
@@ -372,6 +375,7 @@ private fun VagaOcupada(
     aoVerFicha: () -> Unit,
     aoRemover: () -> Unit,
     aoMega: (Int) -> Unit,
+    aoTrocar: () -> Unit,
 ) {
     var menu by remember { mutableStateOf(false) }
     val paleta = LocalPaleta.current
@@ -393,6 +397,7 @@ private fun VagaOcupada(
             p.tipos.forEach { SeloTipo(it, compacto = true) }
         }
         DropdownMenu(expanded = menu, onDismissRequest = { menu = false }) {
+            DropdownMenuItem(text = { Text("Trocar por…") }, onClick = { menu = false; aoTrocar() })
             DropdownMenuItem(text = { Text("Ver ficha") }, onClick = { menu = false; aoVerFicha() })
             megas.forEach { m ->
                 val ativa = m.id == megaAtiva
@@ -506,4 +511,64 @@ private fun LinhaTipoDefesa(l: LinhaDefesa) {
 private fun Secao(titulo: String) {
     Text(titulo, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold,
         modifier = Modifier.padding(start = 16.dp, top = 20.dp, bottom = 8.dp))
+}
+
+/** Substitutos para um membro: toque e ele entra na mesma vaga. */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun PainelTroca(vm: EditorTimeViewModel, indice: Int, sai: Pokemon, aoFechar: () -> Unit) {
+    val opcoes by androidx.compose.runtime.produceState<com.poketeam.app.domain.Substitutos?>(null, indice, sai.id) {
+        value = vm.substitutos(indice)
+    }
+    val toque = LocalHapticFeedback.current
+    val escolher = { p: Pokemon -> toque.performHapticFeedback(HapticFeedbackType.LongPress); vm.trocar(indice, p); aoFechar() }
+    ModalBottomSheet(onDismissRequest = aoFechar, sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)) {
+        Column(Modifier.padding(horizontal = 16.dp).padding(bottom = 24.dp).verticalScroll(rememberScrollState())) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Sprite(sai, 40)
+                Text("  TROCAR ${sai.nome.uppercase()}", style = MaterialTheme.typography.titleSmall)
+            }
+            val o = opcoes
+            when {
+                o == null -> Box(Modifier.fillMaxWidth().padding(24.dp), contentAlignment = Alignment.Center) { CircularProgressIndicator() }
+                o.parecidos.isEmpty() && o.paraOTime.isEmpty() ->
+                    Text("Nenhum candidato com as regras atuais.", color = LocalPaleta.current.sub, modifier = Modifier.padding(12.dp))
+                else -> {
+                    if (o.parecidos.isNotEmpty()) {
+                        TituloTroca("Parecidos (tipo em comum)")
+                        o.parecidos.forEach { LinhaTroca(it, escolher) }
+                    }
+                    if (o.paraOTime.isNotEmpty()) {
+                        TituloTroca("Melhores para o time")
+                        o.paraOTime.forEach { LinhaTroca(it, escolher) }
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun TituloTroca(t: String) {
+    Text(t.uppercase(), style = MaterialTheme.typography.labelMedium, color = LocalPaleta.current.sub,
+        modifier = Modifier.padding(top = 14.dp, bottom = 4.dp))
+}
+
+@Composable
+private fun LinhaTroca(s: Sugestao, aoEscolher: (Pokemon) -> Unit) {
+    val p = s.pokemon
+    Row(Modifier.fillMaxWidth().clickable { aoEscolher(p) }.padding(vertical = 5.dp), verticalAlignment = Alignment.CenterVertically) {
+        Sprite(p, 48)
+        Column(Modifier.weight(1f).padding(start = 8.dp)) {
+            Text(p.nomeCompleto, style = MaterialTheme.typography.bodyLarge, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            Row(horizontalArrangement = Arrangement.spacedBy(2.dp), verticalAlignment = Alignment.CenterVertically) {
+                p.tipos.forEach { SeloTipo(it, compacto = true) }
+                Text("  Total ${p.total}", style = MaterialTheme.typography.labelSmall, color = LocalPaleta.current.sub)
+            }
+            if (s.resolve.isNotEmpty()) Text("Fecha: " + s.resolve.joinToString { it.nome },
+                style = MaterialTheme.typography.labelSmall, color = CorBoa)
+            if (s.cria.isNotEmpty()) Text("Deixa fraco a: " + s.cria.joinToString { it.nome },
+                style = MaterialTheme.typography.labelSmall, color = CorAlerta)
+        }
+    }
 }

@@ -60,4 +60,13 @@ class RecomendacaoTest {
         assertTrue(!FormatoSmogon.UU.casa("National Dex UU"))
         assertTrue(FormatoSmogon.NATIONAL_DEX.casa("National Dex UU"))
     }
+
+    @Test fun substitutosParecidosEParaOTime() {
+        val time = listOf(pool[9], pool[10], pool[11]) // Fogo, Água, Planta
+        val subs = Sugestoes.substitutos(time, 1, pool, 4)
+        val todos = subs.parecidos + subs.paraOTime
+        assertTrue(todos.none { s -> time.any { it.dex == s.pokemon.dex } })
+        assertEquals(51, subs.parecidos.first().pokemon.id) // Água/Fada: único com tipo em comum
+        assertTrue(subs.paraOTime.none { it.pokemon.id == 51 })
+    }
 }

@@ -1,5 +1,5 @@
 // Servidor de amigos do PokeTeam: login com Google, perfil (apelido e foto), amizades por código
-// e times compartilhados. Cloudflare Workers + D1 (banco e fotos).
+// times compartilhados e salas de draft online. Cloudflare Workers + D1 (banco e fotos).
 
 const MAX_FOTO = 200 * 1024;          // a foto chega reduzida do app (~20 KB); isto é só um teto
 const MAX_TIME = 32 * 1024;
@@ -62,6 +62,19 @@ async function rotear(req, env) {
   r = p.match(/^\/times\/([\w-]{1,64})$/);
   if (m === "PUT" && r) return salvarTime(req, env, eu, r[1]);
   if (m === "DELETE" && r) return apagarTime(env, eu, r[1]);
+
+  if (m === "GET" && p === "/salas") return listarSalas(env, eu);
+  if (m === "POST" && p === "/salas") return criarSala(req, env, eu);
+  r = p.match(/^\/salas\/([A-Z0-9]{4,8})(\/\w+)?$/);
+  if (r) {
+    const [, cod, acao = ""] = r;
+    if (m === "GET" && !acao) return verSala(env, eu, cod, url);
+    if (m === "POST" && acao === "/entrar") return entrarSala(env, eu, cod);
+    if (m === "POST" && acao === "/sair") return sairSala(env, eu, cod);
+    if (m === "POST" && acao === "/iniciar") return iniciarSala(env, eu, cod);
+    if (m === "POST" && acao === "/escolher") return escolherSala(req, env, eu, cod);
+    if (m === "POST" && acao === "/desfazer") return desfazerSala(env, eu, cod);
+  }
 
   throw new ErroHttp(404, "Não encontrado");
 }
@@ -150,6 +163,7 @@ async function apagarConta(env, eu) {
     env.DB.prepare("DELETE FROM sessoes WHERE usuario = ?").bind(eu),
     env.DB.prepare("DELETE FROM amizades WHERE de = ? OR para = ?").bind(eu, eu),
     env.DB.prepare("DELETE FROM times WHERE dono = ?").bind(eu),
+    env.DB.prepare("DELETE FROM salas WHERE dono = ?").bind(eu),
     env.DB.prepare("DELETE FROM usuarios WHERE id = ?").bind(eu),
   ]);
   return json({ ok: true });
@@ -308,6 +322,146 @@ async function salvarTime(req, env, eu, id) {
 async function apagarTime(env, eu, id) {
   await env.DB.prepare("DELETE FROM times WHERE dono = ? AND id = ?").bind(eu, id).run();
   return json({ ok: true });
+}
+
+// ---------- draft online ----------
+
+const MAX_SALA = 64 * 1024;          // o pool vai junto (lista de banidos etc.)
+const MAX_JOGADORES_SALA = 4;
+const VIDA_SALA = 24 * 60 * 60 * 1000;
+
+/** Jogador da escolha número n (0 = primeira), com ordem serpente ou fixa. Igual ao app. */
+function jogadorDaEscolha(sala, n) {
+  const j = sala.jogadores.length;
+  const rodada = Math.floor(n / j), pos = n % j;
+  return sala.serpente && rodada % 2 === 1 ? j - 1 - pos : pos;
+}
+
+function resumoSala(s) {
+  return { codigo: s.codigo, estado: s.estado, dono: s.dono, jogadores: s.jogadores.map((j) => j.apelido), porJogador: s.porJogador };
+}
+
+async function lerSala(env, cod) {
+  const l = await env.DB.prepare("SELECT dados, versao, estado FROM salas WHERE codigo = ?").bind(cod).first();
+  if (!l) throw new ErroHttp(404, "Sala não encontrada (talvez tenha sido encerrada)");
+  return { ...JSON.parse(l.dados), versao: l.versao, estado: l.estado };
+}
+
+/** Grava só se ninguém mudou a sala no meio (versão igual); senão pede para tentar de novo. */
+async function gravarSala(env, s) {
+  const { versao, ...dados } = s;
+  const part = "," + s.jogadores.map((j) => j.id).join(",") + ",";
+  const r = await env.DB.prepare(
+    "UPDATE salas SET dados = ?, participantes = ?, estado = ?, versao = versao + 1, alterado_em = ? WHERE codigo = ? AND versao = ?",
+  ).bind(JSON.stringify(dados), part, s.estado, Date.now(), s.codigo, versao).run();
+  if (!r.meta.changes) throw new ErroHttp(409, "A sala mudou ao mesmo tempo; tente de novo");
+  return json({ ...dados, versao: versao + 1 });
+}
+
+async function listarSalas(env, eu) {
+  await env.DB.prepare("DELETE FROM salas WHERE alterado_em < ?").bind(Date.now() - VIDA_SALA).run();
+  const minhas = await env.DB.prepare("SELECT dados, estado FROM salas WHERE participantes LIKE ? ORDER BY alterado_em DESC")
+    .bind(`%,${eu},%`).all();
+  // Salas esperando gente, abertas por amigos.
+  const abertas = await env.DB.prepare(
+    `SELECT s.dados, s.estado FROM salas s
+      WHERE s.estado = 'espera' AND s.participantes NOT LIKE ? AND s.dono IN (
+        SELECT CASE WHEN de = ? THEN para ELSE de END FROM amizades WHERE aceita = 1 AND (de = ? OR para = ?))
+      ORDER BY s.alterado_em DESC`,
+  ).bind(`%,${eu},%`, eu, eu, eu).all();
+  const res = (l) => resumoSala({ ...JSON.parse(l.dados), estado: l.estado });
+  return json({ minhas: minhas.results.map(res), abertas: abertas.results.map(res) });
+}
+
+async function criarSala(req, env, eu) {
+  const c = await corpo(req, MAX_SALA);
+  const porJogador = Number(c.porJogador);
+  if (!Number.isInteger(porJogador) || porJogador < 1 || porJogador > 6) throw new ErroHttp(400, "Pokémons por jogador: de 1 a 6");
+  if (!c.pool || typeof c.pool !== "object") throw new ErroHttp(400, "Falta o pool");
+  await env.DB.prepare("DELETE FROM salas WHERE alterado_em < ?").bind(Date.now() - VIDA_SALA).run();
+  const eu_ = await perfil(env, eu);
+  const sala = {
+    dono: eu, estado: "espera", porJogador, serpente: c.serpente !== false,
+    modo: c.modo === "LIVRE" ? "LIVRE" : "OPCOES", soFinais: c.soFinais !== false, pool: c.pool,
+    jogadores: [{ id: eu, apelido: eu_.apelido }], escolhas: [],
+  };
+  for (let tentativa = 0; tentativa < 5; tentativa++) {
+    sala.codigo = novoCodigo().slice(0, 5);
+    try {
+      await env.DB.prepare(
+        "INSERT INTO salas (codigo, dono, participantes, estado, dados, versao, alterado_em) VALUES (?, ?, ?, 'espera', ?, 1, ?)",
+      ).bind(sala.codigo, eu, `,${eu},`, JSON.stringify(sala), Date.now()).run();
+      return json({ ...sala, versao: 1 });
+    } catch (e) {
+      if (!String(e).includes("UNIQUE")) throw e;
+    }
+  }
+  throw new ErroHttp(500, "Não deu para criar a sala");
+}
+
+/** ?versao=N: se a sala não mudou, responde só {mudou:false} (o app consulta a cada poucos segundos). */
+async function verSala(env, eu, cod, url) {
+  const v = Number(url.searchParams.get("versao") || 0);
+  const l = await env.DB.prepare("SELECT versao FROM salas WHERE codigo = ?").bind(cod).first();
+  if (!l) throw new ErroHttp(404, "Sala não encontrada (talvez tenha sido encerrada)");
+  if (v && v === l.versao) return json({ mudou: false });
+  return json(await lerSala(env, cod));
+}
+
+async function entrarSala(env, eu, cod) {
+  const s = await lerSala(env, cod);
+  if (s.jogadores.some((j) => j.id === eu)) return json(s);
+  if (s.estado !== "espera") throw new ErroHttp(400, "O draft dessa sala já começou");
+  if (s.jogadores.length >= MAX_JOGADORES_SALA) throw new ErroHttp(400, `A sala já tem ${MAX_JOGADORES_SALA} jogadores`);
+  const p = await perfil(env, eu);
+  s.jogadores.push({ id: eu, apelido: p.apelido });
+  return gravarSala(env, s);
+}
+
+/** Anfitrião sair encerra a sala; outro jogador só sai antes de começar. */
+async function sairSala(env, eu, cod) {
+  const s = await lerSala(env, cod);
+  if (s.dono === eu) {
+    await env.DB.prepare("DELETE FROM salas WHERE codigo = ?").bind(cod).run();
+    return json({ ok: true });
+  }
+  if (s.estado !== "espera") return json({ ok: true }); // depois de começar, a vaga fica (as escolhas são dele)
+  s.jogadores = s.jogadores.filter((j) => j.id !== eu);
+  await gravarSala(env, s);
+  return json({ ok: true });
+}
+
+async function iniciarSala(env, eu, cod) {
+  const s = await lerSala(env, cod);
+  if (s.dono !== eu) throw new ErroHttp(403, "Só o anfitrião começa o draft");
+  if (s.estado !== "espera") throw new ErroHttp(400, "O draft já começou");
+  if (s.jogadores.length < 2) throw new ErroHttp(400, "Precisa de pelo menos 2 jogadores");
+  s.estado = "andamento";
+  return gravarSala(env, s);
+}
+
+/** {pokemonId, dex, n}: n é o número da escolha que o app viu (evita escolha dupla com rede lenta). */
+async function escolherSala(req, env, eu, cod) {
+  const { pokemonId, dex, n } = await corpo(req);
+  if (!Number.isInteger(pokemonId) || !Number.isInteger(dex) || !Number.isInteger(n)) throw new ErroHttp(400, "Escolha inválida");
+  const s = await lerSala(env, cod);
+  if (s.estado !== "andamento") throw new ErroHttp(400, "O draft não está em andamento");
+  if (n !== s.escolhas.length) throw new ErroHttp(409, "Alguém escolheu antes; atualize");
+  const vez = jogadorDaEscolha(s, n);
+  if (s.jogadores[vez]?.id !== eu) throw new ErroHttp(403, "Não é a sua vez");
+  if (s.escolhas.some((e) => e.dex === dex)) throw new ErroHttp(409, "Esse pokémon já foi escolhido");
+  s.escolhas.push({ jogador: vez, pokemonId, dex });
+  if (s.escolhas.length >= s.jogadores.length * s.porJogador) s.estado = "fim";
+  return gravarSala(env, s);
+}
+
+async function desfazerSala(env, eu, cod) {
+  const s = await lerSala(env, cod);
+  if (s.dono !== eu) throw new ErroHttp(403, "Só o anfitrião desfaz escolhas");
+  if (!s.escolhas.length) throw new ErroHttp(400, "Nada para desfazer");
+  s.escolhas.pop();
+  s.estado = "andamento";
+  return gravarSala(env, s);
 }
 
 // ---------- utilidades ----------

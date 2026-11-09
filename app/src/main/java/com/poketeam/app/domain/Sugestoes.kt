@@ -11,6 +11,9 @@ data class Sugestao(
     val cria: List<Tipo>,
 )
 
+/** Quem pode entrar no lugar de um membro: parecidos com ele e os que mais ajudam o time. */
+data class Substitutos(val parecidos: List<Sugestao>, val paraOTime: List<Sugestao>)
+
 /** Quanto a força no Smogon pesa na recomendação. */
 @Serializable
 enum class EstiloRecomendar(val rotulo: String, val pesoForca: Int) {
@@ -97,6 +100,33 @@ object Sugestoes {
      */
     fun para(time: List<Pokemon>, candidatos: List<Pokemon>, quantos: Int = 6, ajustes: AjustesSugestao = AjustesSugestao()): List<Sugestao> {
         if (time.isEmpty() || time.size >= Time.MAXIMO) return emptyList()
+        return pontuar(time, candidatos, ajustes).sortedByDescending { it.first }.take(quantos).map { it.second }.toList()
+    }
+
+    /**
+     * Substitutos para o membro [indice]: quem melhor ocupa a vaga no time sem ele, com vantagem
+     * para quem tem tipo em comum (troca "parecida") e total de stats perto do original.
+     */
+    fun substitutos(
+        time: List<Pokemon>, indice: Int, candidatos: List<Pokemon>, quantos: Int = 4, ajustes: AjustesSugestao = AjustesSugestao(),
+    ): Substitutos {
+        val sai = time.getOrNull(indice) ?: return Substitutos(emptyList(), emptyList())
+        val resto = time.filterIndexed { i, _ -> i != indice }
+        val semEle = candidatos.filter { it.dex != sai.dex }
+        val pontuados = (if (resto.isEmpty()) semEle.asSequence().map { notaSozinho(it, ajustes) to Sugestao(it, emptyList(), emptyList()) }
+        else pontuar(resto, semEle, ajustes)).toList()
+        // Parecidos: tipo em comum com quem sai; entre eles, quem encaixa melhor e tem total de stats perto.
+        val parecidos = pontuados.filter { (_, s) -> s.pokemon.tipos.any { it in sai.tipos } }
+            .sortedByDescending { (nota, s) ->
+                nota + s.pokemon.tipos.count { it in sai.tipos } * 300 - minOf(kotlin.math.abs(s.pokemon.total - sai.total), 200)
+            }
+            .take(quantos).map { it.second }
+        val usados = parecidos.map { it.pokemon.id }.toSet()
+        val paraOTime = pontuados.filter { it.second.pokemon.id !in usados }.sortedByDescending { it.first }.take(quantos).map { it.second }
+        return Substitutos(parecidos, paraOTime)
+    }
+
+    private fun pontuar(time: List<Pokemon>, candidatos: List<Pokemon>, ajustes: AjustesSugestao): Sequence<Pair<Int, Sugestao>> {
         val antes = AnaliseTime.de(time)
         val problemasAntes = antes.problemas.map { it.tipo }.toSet()
         // Tipos de ataque em que o time tem mais fracos do que quem segura.
@@ -117,9 +147,5 @@ object Sugestoes {
                     segura * 100 + coberturaNova * 10 + bonus(c, ajustes) + c.total / 100
                 nota to Sugestao(c, (problemasAntes - problemasDepois).toList(), (problemasDepois - problemasAntes).toList())
             }
-            .sortedByDescending { it.first }
-            .take(quantos)
-            .map { it.second }
-            .toList()
     }
 }

@@ -46,6 +46,7 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -75,14 +76,14 @@ import com.poketeam.app.ui.tema.BotaoPixel
 import com.poketeam.app.ui.tema.TituloPixel
 
 /** Uma cor por jogador, para saber de quem é a vez de longe. */
-private val CoresJogador = listOf(Color(0xFFFF5A4E), Color(0xFF4EA8FF), Color(0xFF7BC86C), Color(0xFFFFC94D))
+internal val CoresJogador = listOf(Color(0xFFFF5A4E), Color(0xFF4EA8FF), Color(0xFF7BC86C), Color(0xFFFFC94D))
 
 @Composable
-fun DraftScreen(vm: DraftViewModel, aoSalvar: () -> Unit) {
+fun DraftScreen(vm: DraftViewModel, aoSalvar: () -> Unit, aoAbrirSala: (String) -> Unit) {
     val carga by vm.tela.collectAsStateWithLifecycle()
     when (val c = carga) {
         Carga.Carregando -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { CircularProgressIndicator() }
-        Carga.SemDraft -> Configuracao(vm)
+        Carga.SemDraft -> Configuracao(vm, aoAbrirSala)
         is Carga.EmAndamento ->
             if (c.tela.draft.terminou) Resultado(c.tela, vm, aoSalvar) else Vez(c.tela, vm)
     }
@@ -92,15 +93,22 @@ fun DraftScreen(vm: DraftViewModel, aoSalvar: () -> Unit) {
 
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
-private fun Configuracao(vm: DraftViewModel) {
+private fun Configuracao(vm: DraftViewModel, aoAbrirSala: (String) -> Unit) {
     val c by vm.config.collectAsStateWithLifecycle()
 
     Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(16.dp)) {
         TituloPixel("Draft")
-        Text("Passem o celular: cada um escolhe na sua vez, e quem pega primeiro leva.",
+        Text("Cada um escolhe na sua vez, e quem pega primeiro leva.",
             style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
 
-        Titulo("Jogadores")
+        if (vm.onlineDisponivel) SecaoOnline(vm, aoAbrirSala)
+
+        Titulo("Regras")
+        RegrasDraft(c, vm)
+
+        Titulo("No mesmo celular")
+        Text("Passem o celular de mão em mão.", style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(bottom = 6.dp))
         c.jogadores.forEachIndexed { i, nome ->
             Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(vertical = 3.dp)) {
                 Box(Modifier.size(14.dp).background(CoresJogador[i]))
@@ -117,18 +125,28 @@ private fun Configuracao(vm: DraftViewModel) {
             }
         }
 
-        Titulo("Pokémons por jogador")
+        BotaoPixel(onClick = vm::iniciar, modifier = Modifier.fillMaxWidth().padding(top = 16.dp)) {
+            Text("Começar draft aqui", style = MaterialTheme.typography.titleMedium)
+        }
+    }
+}
+
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+private fun RegrasDraft(c: com.poketeam.app.domain.ConfigDraft, vm: DraftViewModel) {
+    Column {
+        Subtitulo("Pokémons por jogador")
         FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
             (1..6).forEach { n -> FilterChip(selected = c.porJogador == n, onClick = { vm.mudarPorJogador(n) }, label = { Text("$n") }) }
         }
 
-        Titulo("Ordem")
+        Subtitulo("Ordem")
         FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
             FilterChip(selected = c.serpente, onClick = { if (!c.serpente) vm.alternarSerpente() }, label = { Text("Serpente (1-2, 2-1)") })
             FilterChip(selected = !c.serpente, onClick = { if (c.serpente) vm.alternarSerpente() }, label = { Text("Fixa (1-2, 1-2)") })
         }
 
-        Titulo("Como escolher")
+        Subtitulo("Como escolher")
         FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
             FilterChip(selected = c.modo == ModoDraft.OPCOES, onClick = { vm.mudarModo(ModoDraft.OPCOES) }, label = { Text("3 opções sorteadas") })
             FilterChip(selected = c.modo == ModoDraft.LIVRE, onClick = { vm.mudarModo(ModoDraft.LIVRE) }, label = { Text("Livre (busca)") })
@@ -140,13 +158,69 @@ private fun Configuracao(vm: DraftViewModel) {
             modifier = Modifier.padding(top = 4.dp),
         )
 
-        Titulo("Regras")
-        FilterChip(selected = c.soFinais, onClick = vm::alternarFinais, label = { Text("Só evolução final") })
-
-        BotaoPixel(onClick = vm::iniciar, modifier = Modifier.fillMaxWidth().padding(top = 24.dp)) {
-            Text("Começar draft", style = MaterialTheme.typography.titleMedium)
-        }
+        FilterChip(selected = c.soFinais, onClick = vm::alternarFinais, label = { Text("Só evolução final") },
+            modifier = Modifier.padding(top = 8.dp))
     }
+}
+
+@Composable
+private fun SecaoOnline(vm: DraftViewModel, aoAbrirSala: (String) -> Unit) {
+    val logado by vm.logado.collectAsStateWithLifecycle()
+    val salas by vm.salas.collectAsStateWithLifecycle()
+    val erro by vm.erroOnline.collectAsStateWithLifecycle()
+    val ocupado by vm.ocupadoOnline.collectAsStateWithLifecycle()
+    LaunchedEffect(logado) { if (logado) vm.atualizarSalas() }
+
+    Titulo("Online, cada um no seu celular")
+    if (!logado) {
+        Text("Entre com sua conta na aba Amigos para jogar online.", style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant)
+        return
+    }
+    var codigo by remember { mutableStateOf("") }
+    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        BotaoPixel(onClick = { vm.criarSala(aoAbrirSala) }, enabled = !ocupado, modifier = Modifier.weight(1f)) {
+            Text("Criar sala", style = MaterialTheme.typography.titleSmall)
+        }
+        OutlinedTextField(
+            value = codigo, onValueChange = { codigo = com.poketeam.app.data.DraftOnline.normalizarCodigo(it).take(8) },
+            singleLine = true, placeholder = { Text("Código") }, shape = RectangleShape, modifier = Modifier.width(110.dp),
+        )
+        TextButton(onClick = { vm.entrarNaSala(codigo, aoAbrirSala) }, enabled = codigo.length >= 4 && !ocupado) { Text("Entrar") }
+    }
+    if (erro != null) Text(erro!!, color = CorAlerta, style = MaterialTheme.typography.bodySmall, modifier = Modifier.padding(top = 4.dp))
+    val s = salas
+    if (s != null && s.abertas.isNotEmpty()) {
+        Subtitulo("Salas de amigos esperando gente")
+        s.abertas.forEach { r -> LinhaSala(r, "Entrar") { vm.entrarNaSala(r.codigo, aoAbrirSala) } }
+    }
+    if (s != null && s.minhas.isNotEmpty()) {
+        Subtitulo("Suas salas")
+        s.minhas.forEach { r -> LinhaSala(r, "Abrir") { aoAbrirSala(r.codigo) } }
+    }
+    Text("A sala usa as regras abaixo e o pool ativo.", style = MaterialTheme.typography.labelSmall,
+        color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(top = 6.dp))
+}
+
+@Composable
+private fun LinhaSala(r: com.poketeam.app.data.ResumoSala, acao: String, aoClicar: () -> Unit) {
+    Row(
+        Modifier.fillMaxWidth().clickable(onClick = aoClicar).padding(vertical = 6.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Column(Modifier.weight(1f)) {
+            Text(r.jogadores.joinToString(", "), style = MaterialTheme.typography.bodyLarge, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            Text("Sala ${r.codigo} · " + when (r.estado) { "espera" -> "esperando"; "fim" -> "terminou"; else -> "em andamento" } +
+                " · ${r.porJogador} por jogador", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
+        Text(acao.uppercase(), color = MaterialTheme.colorScheme.primary, style = MaterialTheme.typography.labelLarge)
+    }
+}
+
+@Composable
+private fun Subtitulo(t: String) {
+    Text(t, style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSurfaceVariant,
+        modifier = Modifier.padding(top = 12.dp, bottom = 4.dp))
 }
 
 // ---------- Vez de alguém ----------
@@ -204,7 +278,7 @@ private fun Vez(t: TelaDraft, vm: DraftViewModel) {
 }
 
 @Composable
-private fun ResumoEscolhas(t: TelaDraft, destaque: Int?) {
+internal fun ResumoEscolhas(t: TelaDraft, destaque: Int?) {
     Column(Modifier.padding(horizontal = 12.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
         t.draft.jogadores.forEachIndexed { j, nome ->
             Row(verticalAlignment = Alignment.CenterVertically) {
@@ -222,7 +296,7 @@ private fun ResumoEscolhas(t: TelaDraft, destaque: Int?) {
 }
 
 @Composable
-private fun Opcoes(opcoes: List<Pokemon>, cor: Color, escolherSemToque: (Pokemon) -> Unit) {
+internal fun Opcoes(opcoes: List<Pokemon>, cor: Color, escolherSemToque: (Pokemon) -> Unit) {
     val toque = LocalHapticFeedback.current
     val escolher: (Pokemon) -> Unit = { toque.performHapticFeedback(HapticFeedbackType.LongPress); escolherSemToque(it) }
     if (opcoes.isEmpty()) {
@@ -257,18 +331,29 @@ private fun Opcoes(opcoes: List<Pokemon>, cor: Color, escolherSemToque: (Pokemon
 @Composable
 private fun ListaBusca(t: TelaDraft, vm: DraftViewModel, voltarParaOpcoes: (() -> Unit)?) {
     val busca by vm.busca.collectAsStateWithLifecycle()
+    ListaBusca(t.lista, busca, vm::buscar, vm::escolher, voltarParaOpcoes)
+}
+
+@Composable
+internal fun ListaBusca(
+    lista: List<Pokemon>,
+    busca: String,
+    aoBuscar: (String) -> Unit,
+    aoEscolher: (Pokemon) -> Unit,
+    voltarParaOpcoes: (() -> Unit)?,
+) {
     Row(Modifier.padding(horizontal = 12.dp, vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
         OutlinedTextField(
-            value = busca, onValueChange = vm::buscar, singleLine = true,
+            value = busca, onValueChange = aoBuscar, singleLine = true,
             placeholder = { Text("Buscar no pool") },
             leadingIcon = { Icon(Icons.Default.Search, null) },
-            trailingIcon = { if (busca.isNotEmpty()) IconButton(onClick = { vm.buscar("") }) { Icon(Icons.Default.Close, "Limpar") } },
+            trailingIcon = { if (busca.isNotEmpty()) IconButton(onClick = { aoBuscar("") }) { Icon(Icons.Default.Close, "Limpar") } },
             shape = RectangleShape, modifier = Modifier.weight(1f),
         )
-        if (voltarParaOpcoes != null) IconButton(onClick = { vm.buscar(""); voltarParaOpcoes() }) { Icon(Icons.Default.List, "Voltar às opções") }
+        if (voltarParaOpcoes != null) IconButton(onClick = { aoBuscar(""); voltarParaOpcoes() }) { Icon(Icons.Default.List, "Voltar às opções") }
     }
     LazyColumn(Modifier.fillMaxSize()) {
-        items(t.lista, key = Pokemon::id) { p -> LinhaPokemon(p, false, Icons.Default.CheckCircle, "") { vm.escolher(p) } }
+        items(lista, key = Pokemon::id) { p -> LinhaPokemon(p, false, Icons.Default.CheckCircle, "") { aoEscolher(p) } }
     }
 }
 

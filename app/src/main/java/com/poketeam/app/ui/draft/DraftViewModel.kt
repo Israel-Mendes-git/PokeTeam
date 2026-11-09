@@ -3,6 +3,11 @@ package com.poketeam.app.ui.draft
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.poketeam.app.data.Drafts
+import com.poketeam.app.data.Conta
+import com.poketeam.app.data.DraftOnline
+import com.poketeam.app.data.ErroServidor
+import com.poketeam.app.data.ListaSalas
+import kotlinx.coroutines.flow.map
 import com.poketeam.app.data.Pokedex
 import com.poketeam.app.data.Pools
 import com.poketeam.app.data.Prefs
@@ -41,7 +46,41 @@ class DraftViewModel(
     private val pokedex: Pokedex,
     private val pools: Pools,
     private val prefs: Prefs,
+    private val conta: Conta,
+    private val online: DraftOnline,
 ) : ViewModel() {
+    // ---------- online ----------
+    val onlineDisponivel: Boolean = conta.disponivel
+    val logado: StateFlow<Boolean> = conta.eu.map { it != null }.stateIn(viewModelScope, SharingStarted.Eagerly, conta.eu.value != null)
+    private val _salas = MutableStateFlow<ListaSalas?>(null)
+    val salas: StateFlow<ListaSalas?> = _salas
+    private val _erroOnline = MutableStateFlow<String?>(null)
+    val erroOnline: StateFlow<String?> = _erroOnline
+    private val _ocupadoOnline = MutableStateFlow(false)
+    val ocupadoOnline: StateFlow<Boolean> = _ocupadoOnline
+
+    fun atualizarSalas() = viewModelScope.launch {
+        runCatching { online.listar() }.onSuccess { _salas.value = it; _erroOnline.value = null }
+            .onFailure { _erroOnline.value = it.message }
+    }
+
+    private fun online(acao: suspend () -> String, depois: (String) -> Unit) = viewModelScope.launch {
+        if (_ocupadoOnline.value) return@launch
+        _ocupadoOnline.value = true
+        try {
+            val codigo = acao()
+            _erroOnline.value = null
+            depois(codigo)
+        } catch (e: ErroServidor) {
+            _erroOnline.value = e.message
+        } finally {
+            _ocupadoOnline.value = false
+        }
+    }
+
+    fun criarSala(aoCriar: (String) -> Unit) = online({ online.criar(_config.value, pools.ativo.value).codigo }, aoCriar)
+    fun entrarNaSala(codigo: String, aoEntrar: (String) -> Unit) = online({ online.entrar(codigo).codigo }, aoEntrar)
+
     // Cópia local (o cursor não pula ao digitar nomes); cada mudança também vai para as preferências.
     private val _config = MutableStateFlow(ConfigDraft())
     val config: StateFlow<ConfigDraft> = _config

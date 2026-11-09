@@ -1,5 +1,6 @@
 package com.poketeam.app.ui.times
 
+import kotlinx.coroutines.withContext
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.poketeam.app.data.Pokedex
@@ -14,6 +15,7 @@ import kotlinx.coroutines.flow.debounce
 import com.poketeam.app.domain.Build
 import com.poketeam.app.domain.Sugestao
 import com.poketeam.app.domain.Sugestoes
+import com.poketeam.app.domain.Substitutos
 import kotlinx.coroutines.flow.combine
 import com.poketeam.app.data.Sorteador
 import com.poketeam.app.domain.RegrasSorteio
@@ -216,6 +218,26 @@ class EditorTimeViewModel(
     }
 
     fun descartarSeVazio() = times.descartarSeVazio(id)
+
+    /** Quem pode entrar no lugar do membro [indice] (mesmas regras do Recomendar). */
+    suspend fun substitutos(indice: Int): Substitutos = withContext(Dispatchers.Default) {
+        val t = time.value ?: return@withContext Substitutos(emptyList(), emptyList())
+        val (candidatos, ajustes) = sorteador.paraRecomendar()
+        Sugestoes.substitutos(t.pokemons, indice, candidatos, 4, ajustes)
+    }
+
+    fun trocar(indice: Int, p: Pokemon) = viewModelScope.launch {
+        esquecerDesfazer()
+        times.atualizar(id) { t ->
+            val sai = t.membros.getOrNull(indice) ?: return@atualizar t
+            val megaSaiu = time.value?.megaAtiva?.let { m -> time.value?.pokemons?.getOrNull(indice)?.dex == m.dex } == true
+            t.copy(
+                membros = t.membros.mapIndexed { i, m -> if (i == indice) p.id else m },
+                builds = t.builds - sai,
+                mega = if (megaSaiu) null else t.mega,
+            )
+        }
+    }
 
     // Limpar o time inteiro de uma vez, com "Desfazer" logo em seguida.
     private var antesDeLimpar: Time? = null

@@ -205,9 +205,17 @@ class MainActivity : ComponentActivity() {
                         }
                         composable(Aba.DRAFT.rota) {
                             val vm: DraftViewModel = viewModel(factory = viewModelFactory {
-                                initializer { DraftViewModel(app.drafts, pokedex, pools, app.prefs) }
+                                initializer { DraftViewModel(app.drafts, pokedex, pools, app.prefs, app.conta, app.draftOnline) }
                             })
-                            DraftScreen(vm, aoSalvar = { nav.irParaAba(Aba.TIMES.rota) })
+                            DraftScreen(vm, aoSalvar = { nav.irParaAba(Aba.TIMES.rota) }, aoAbrirSala = { nav.navigate("sala/$it") })
+                        }
+                        composable("sala/{codigo}") { entrada ->
+                            val codigo = entrada.arguments?.getString("codigo").orEmpty()
+                            val vm: com.poketeam.app.ui.draft.SalaViewModel = viewModel(factory = viewModelFactory {
+                                initializer { com.poketeam.app.ui.draft.SalaViewModel(codigo, app.draftOnline, app.conta, pokedex, times) }
+                            })
+                            com.poketeam.app.ui.draft.SalaScreen(vm, aoSair = { nav.popBackStack() },
+                                aoSalvar = { nav.irParaAba(Aba.TIMES.rota) })
                         }
                         composable("pools") {
                             val vm: PoolsViewModel = viewModel(factory = viewModelFactory {
