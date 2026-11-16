@@ -18,4 +18,4 @@ Para compilar e manter o projeto, veja [DESENVOLVIMENTO.md](DESENVOLVIMENTO.md).
 
 ---
 
-Código sob [licença MIT](LICENSE); os assets não (veja a ressalva no fim do arquivo). Projeto de fã, sem relação com Nintendo, Game Freak ou The Pokémon Company. Dados e sprites: [PokéAPI](https://pokeapi.co). Builds: [Smogon](https://www.smogon.com) via [pkmn](https://github.com/pkmn). Fonte: [Jersey 10](https://fonts.google.com/specimen/Jersey+10) (OFL).
+Código sob [licença MIT](LICENSE); os assets não ([NOTICE.md](NOTICE.md)). Projeto de fã, sem relação com Nintendo, Game Freak ou The Pokémon Company. Dados e sprites: [PokéAPI](https://pokeapi.co). Builds: [Smogon](https://www.smogon.com) via [pkmn](https://github.com/pkmn). Fonte: [Jersey 10](https://fonts.google.com/specimen/Jersey+10) (OFL).
