@@ -33,7 +33,7 @@ Os elencos de modpack ficam em `tools/elencos.json`: cada item aponta para um mo
 
 ## Amigos (servidor)
 
-A pasta `servidor/` é um Cloudflare Worker (D1 para os dados, R2 para as fotos) com login pelo Google.
+A pasta `servidor/` é um Cloudflare Worker (D1 para os dados e para as fotos; o R2 exige cartão na Cloudflare e não foi ativado) com login pelo Google.
 
 ```sh
 cd servidor
